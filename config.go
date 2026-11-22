@@ -20,7 +20,6 @@ type jevConfig struct {
 type config struct {
 	Credentials string     `hcl:"credentials,optional"`
 	Token       string     `hcl:"token,optional"`
-	Backup      string     `hcl:"backup,optional"`
 	Jev         *jevConfig `hcl:"jev,block"`
 }
 
@@ -76,7 +75,6 @@ func loadConfig(fs *flag.FlagSet, args []string) (*config, []string) {
 	fs.StringVar(&configFile, "config", "", "HCL config file")
 	fs.String("credentials", "", "OAuth client credentials file")
 	fs.String("token", "", "OAuth token file")
-	fs.String("backup", "", "directory to save deleted emails")
 	fs.String("jev-api-key", "", "Jev (OpenRouter) API key (or $GMAILT_JEV_API_KEY)")
 	fs.String("jev-base-url", "", "Jev API base URL")
 	fs.String("jev-model", "", "Jev model")
@@ -113,8 +111,6 @@ func loadConfig(fs *flag.FlagSet, args []string) (*config, []string) {
 			cfg.Credentials = f.Value.String()
 		case "token":
 			cfg.Token = f.Value.String()
-		case "backup":
-			cfg.Backup = f.Value.String()
 		case "jev-api-key":
 			cfg.Jev.APIKey = f.Value.String()
 		case "jev-base-url":
@@ -132,7 +128,6 @@ func loadConfig(fs *flag.FlagSet, args []string) (*config, []string) {
 	}
 	cfg.Credentials = expandHome(cfg.Credentials)
 	cfg.Token = expandHome(cfg.Token)
-	cfg.Backup = expandHome(cfg.Backup)
 
 	return cfg, fs.Args()
 }
@@ -144,7 +139,6 @@ func showConfig(cfg *config, args []string) {
 	}
 	fmt.Printf("credentials:  %s\n", cfg.Credentials)
 	fmt.Printf("token:        %s\n", cfg.Token)
-	fmt.Printf("backup:       %s\n", cfg.Backup)
 	fmt.Printf("jev api_key:  %s\n", apiKey)
 	fmt.Printf("jev base_url: %s\n", cfg.Jev.BaseURL)
 	fmt.Printf("jev model:    %s\n", cfg.Jev.Model)

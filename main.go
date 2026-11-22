@@ -30,6 +30,7 @@ var (
 	verbose bool
 
 	cmds = map[string]cmd{
+		"auth":   {flags: authFlags, run: auth, help: "authorize gmailt with Google, or revoke the saved token"},
 		"config": {run: showConfig, help: "show the effective configuration"},
 		"help":   {help: "show this help"},
 	}
