@@ -34,6 +34,7 @@ var (
 		"auth":    {flags: authFlags, run: auth, help: "authorize gmailt with Google, or revoke the saved token"},
 		"config":  {run: showConfig, help: "show the effective configuration"},
 		"get":     {flags: getFlags, run: get, help: "fetch and display messages by id or Gmail search query"},
+		"labels":  {run: labels, help: "list labels with message and unread counts"},
 		"help":    {help: "show this help"},
 		"archive": {run: archive, help: "remove messages from the inbox by id or Gmail search query"},
 		"delete":  {run: trash, help: "move messages to the trash by id or Gmail search query"},
