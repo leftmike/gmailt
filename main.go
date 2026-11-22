@@ -33,6 +33,7 @@ var (
 		"list":   {flags: listFlags, run: list, help: "list messages matching a Gmail search query (default in:inbox)"},
 		"auth":   {flags: authFlags, run: auth, help: "authorize gmailt with Google, or revoke the saved token"},
 		"config": {run: showConfig, help: "show the effective configuration"},
+		"get":    {flags: getFlags, run: get, help: "fetch and display messages by id, or by -q query"},
 		"help":   {help: "show this help"},
 	}
 )
