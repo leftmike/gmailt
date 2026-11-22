@@ -41,7 +41,7 @@ func TestListIDs(t *testing.T) {
 			return
 		}
 		q := r.URL.Query()
-		if q.Get("q") != "from:x" || q.Get("labelIds") != "INBOX" {
+		if q.Get("q") != "from:x" {
 			http.Error(w, "bad query: "+r.URL.RawQuery, http.StatusBadRequest)
 			return
 		}
@@ -50,24 +50,24 @@ func TestListIDs(t *testing.T) {
 	})
 
 	ctx := context.Background()
-	ids, err := listIDs(ctx, svc, "from:x", []string{"INBOX"}, 0)
+	ids, more, err := listIDs(ctx, svc, "from:x", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(ids, []string{"a", "b", "c"}) {
-		t.Errorf("listIDs: got %v", ids)
+	if !slices.Equal(ids, []string{"a", "b", "c"}) || more {
+		t.Errorf("listIDs: got %v, %v", ids, more)
 	}
 	if !slices.Equal(maxResults, []string{"500", "500"}) {
 		t.Errorf("maxResults: got %v", maxResults)
 	}
 
 	maxResults = nil
-	ids, err = listIDs(ctx, svc, "from:x", []string{"INBOX"}, 2)
+	ids, more, err = listIDs(ctx, svc, "from:x", 2)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(ids, []string{"a", "b"}) {
-		t.Errorf("listIDs max 2: got %v", ids)
+	if !slices.Equal(ids, []string{"a", "b"}) || !more {
+		t.Errorf("listIDs max 2: got %v, %v", ids, more)
 	}
 	if !slices.Equal(maxResults, []string{"2"}) {
 		t.Errorf("maxResults max 2: got %v", maxResults)

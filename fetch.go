@@ -74,9 +74,7 @@ func retry[T any](ctx context.Context, call func() (T, error)) (T, error) {
 	}
 }
 
-func listIDs(ctx context.Context, svc *gmail.Service, q string, labelIDs []string,
-	max int) ([]string, error) {
-
+func listIDs(ctx context.Context, svc *gmail.Service, q string, limit int) ([]string, bool, error) {
 	var ids []string
 	var pageToken string
 	for {
@@ -84,27 +82,24 @@ func listIDs(ctx context.Context, svc *gmail.Service, q string, labelIDs []strin
 		if q != "" {
 			call = call.Q(q)
 		}
-		if len(labelIDs) > 0 {
-			call = call.LabelIds(labelIDs...)
-		}
 		if pageToken != "" {
 			call = call.PageToken(pageToken)
 		}
 		n := maxPageSize
-		if max > 0 {
-			n = min(n, max-len(ids))
+		if limit > 0 {
+			n = min(n, limit-len(ids))
 		}
 		call = call.MaxResults(int64(n))
 
 		resp, err := retry(ctx, func() (*gmail.ListMessagesResponse, error) { return call.Do() })
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		for _, m := range resp.Messages {
 			ids = append(ids, m.Id)
 		}
-		if resp.NextPageToken == "" || (max > 0 && len(ids) >= max) {
-			return ids, nil
+		if resp.NextPageToken == "" || (limit > 0 && len(ids) >= limit) {
+			return ids, resp.NextPageToken != "", nil
 		}
 		pageToken = resp.NextPageToken
 	}
