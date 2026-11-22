@@ -11,16 +11,9 @@ import (
 	"github.com/hashicorp/hcl/v2/hclsimple"
 )
 
-type jevConfig struct {
-	APIKey  string `hcl:"api_key,optional"`
-	BaseURL string `hcl:"base_url,optional"`
-	Model   string `hcl:"model,optional"`
-}
-
 type config struct {
-	Credentials string     `hcl:"credentials,optional"`
-	Token       string     `hcl:"token,optional"`
-	Jev         *jevConfig `hcl:"jev,block"`
+	Credentials string `hcl:"credentials,optional"`
+	Token       string `hcl:"token,optional"`
 }
 
 func configDir() string {
@@ -75,9 +68,6 @@ func loadConfig(fs *flag.FlagSet, args []string) (*config, []string) {
 	fs.StringVar(&configFile, "config", "", "HCL config file")
 	fs.String("credentials", "", "OAuth client credentials file")
 	fs.String("token", "", "OAuth token file")
-	fs.String("jev-api-key", "", "Jev (OpenRouter) API key (or $GMAILT_JEV_API_KEY)")
-	fs.String("jev-base-url", "", "Jev API base URL")
-	fs.String("jev-model", "", "Jev model")
 	fs.Parse(args)
 
 	var cfg *config
@@ -97,26 +87,12 @@ func loadConfig(fs *flag.FlagSet, args []string) (*config, []string) {
 			cfg = &config{}
 		}
 	}
-	if cfg.Jev == nil {
-		cfg.Jev = &jevConfig{}
-	}
-
-	if v, ok := os.LookupEnv("GMAILT_JEV_API_KEY"); ok {
-		cfg.Jev.APIKey = v
-	}
-
 	fs.Visit(func(f *flag.Flag) {
 		switch f.Name {
 		case "credentials":
 			cfg.Credentials = f.Value.String()
 		case "token":
 			cfg.Token = f.Value.String()
-		case "jev-api-key":
-			cfg.Jev.APIKey = f.Value.String()
-		case "jev-base-url":
-			cfg.Jev.BaseURL = f.Value.String()
-		case "jev-model":
-			cfg.Jev.Model = f.Value.String()
 		}
 	})
 
@@ -133,13 +109,6 @@ func loadConfig(fs *flag.FlagSet, args []string) (*config, []string) {
 }
 
 func showConfig(cfg *config, args []string) {
-	apiKey := ""
-	if cfg.Jev.APIKey != "" {
-		apiKey = "(set)"
-	}
-	fmt.Printf("credentials:  %s\n", cfg.Credentials)
-	fmt.Printf("token:        %s\n", cfg.Token)
-	fmt.Printf("jev api_key:  %s\n", apiKey)
-	fmt.Printf("jev base_url: %s\n", cfg.Jev.BaseURL)
-	fmt.Printf("jev model:    %s\n", cfg.Jev.Model)
+	fmt.Printf("credentials: %s\n", cfg.Credentials)
+	fmt.Printf("token:       %s\n", cfg.Token)
 }
