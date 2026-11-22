@@ -66,19 +66,26 @@ func TestFormatBody(t *testing.T) {
 	}
 }
 
-func TestParseIDs(t *testing.T) {
-	ids, err := parseIDs([]string{"1a2046b535d465fe", "1A2044F4048D3679"})
+func TestParseIDArgs(t *testing.T) {
+	ids, query, err := parseIDArgs([]string{"1a2046b535d465fe", "1A2044F4048D3679"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(ids, []string{"1a2046b535d465fe", "1a2044f4048d3679"}) {
-		t.Errorf("parseIDs: got %v", ids)
+	if !slices.Equal(ids, []string{"1a2046b535d465fe", "1a2044f4048d3679"}) || query != "" {
+		t.Errorf("parseIDArgs ids: got %v, %q", ids, query)
 	}
 
-	for _, bad := range []string{"", "1-5", "xyz", "1a2046b535d465fe!"} {
-		if _, err := parseIDs([]string{bad}); err == nil {
-			t.Errorf("parseIDs(%q): expected error", bad)
-		}
+	ids, query, err = parseIDArgs([]string{"from:alice", "is:unread", "1a2046b535d465f",
+		"1a2046b535d465fe0", "1a2046b535d465fg"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ids != nil || query != "from:alice is:unread 1a2046b535d465f 1a2046b535d465fe0 1a2046b535d465fg" {
+		t.Errorf("parseIDArgs query: got %v, %q", ids, query)
+	}
+
+	if _, _, err := parseIDArgs([]string{"1a2046b535d465fe", "from:alice"}); err == nil {
+		t.Error("parseIDArgs mixed: expected error")
 	}
 }
 

@@ -17,7 +17,6 @@ var (
 
 func getFlags(fs *flag.FlagSet) {
 	fs.StringVar(&format, "format", "normal", "brief|normal|full|raw|parts|labels")
-	idFlags(fs)
 }
 
 func formatLabels(ids []string, names map[string]string) string {
@@ -90,7 +89,7 @@ func get(cfg *config, args []string) {
 	}
 
 	ctx := context.Background()
-	svc, ids := selectIDs(ctx, cfg, args, "[-format <format>] <id>... | -q <query>")
+	svc, ids := selectIDs(ctx, cfg, args, "[-format <format>] <id>... | <query>...")
 
 	separator := func(id string) {
 		if len(ids) > 1 {
