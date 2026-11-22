@@ -35,6 +35,8 @@ var (
 		"config": {run: showConfig, help: "show the effective configuration"},
 		"get":    {flags: getFlags, run: get, help: "fetch and display messages by id or Gmail search query"},
 		"help":   {help: "show this help"},
+		"delete": {run: trash, help: "move messages to the trash by id or Gmail search query"},
+		"trash":  {run: trash, help: "same as delete"},
 	}
 )
 
