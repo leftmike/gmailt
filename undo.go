@@ -261,8 +261,7 @@ func perMessage(ctx context.Context, cfg *config, ids []string,
 	call func(ctx context.Context, id string) (*gmail.Message, error)) ([]string, error) {
 
 	var found []string
-	gone := 0
-	err := each(ctx, cfg.out, ids,
+	err := each(ctx, cfg.errOut, ids,
 		func(ctx context.Context, id string) (*gmail.Message, error) {
 			m, err := call(ctx, id)
 			if notFound(err) {
@@ -273,7 +272,6 @@ func perMessage(ctx context.Context, cfg *config, ids []string,
 		func(id string, m *gmail.Message) error {
 			if m == nil {
 				warn(cfg, fmt.Errorf("%s no longer exists", id))
-				gone += 1
 			} else {
 				found = append(found, id)
 			}
@@ -281,9 +279,6 @@ func perMessage(ctx context.Context, cfg *config, ids []string,
 		})
 	if err != nil {
 		return nil, err
-	}
-	if n := len(ids) - len(found) - gone; n > 0 {
-		return nil, fmt.Errorf("%d of %d messages failed", n, len(ids))
 	}
 	return found, nil
 }

@@ -394,9 +394,10 @@ func TestGetCommand(t *testing.T) {
 		t.Errorf("get raw: got %q", got)
 	}
 
-	got = tr.ok("get", "0000000000000fff")
-	if !strings.HasPrefix(got, "skipping: 0000000000000fff: ") {
-		t.Errorf("get missing: got %q", got)
+	out, errOut, err := tr.run("get", "000000000000000a", "0000000000000fff")
+	if err == nil || err.Error() != "1 of 2 failed" || !strings.Contains(out, "body of 000000000000000a") ||
+		strings.Contains(out, "skipping") || !strings.HasPrefix(errOut, "skipping: 0000000000000fff: ") {
+		t.Errorf("get missing: got %v, stdout %q, stderr %q", err, out, errOut)
 	}
 
 	tr.usage("get")
@@ -479,10 +480,11 @@ func TestLabelUndo(t *testing.T) {
 func TestDeleteUndo(t *testing.T) {
 	tr := newTestRun(t)
 
-	got := tr.ok("delete", "000000000000000a", "0000000000000fff")
-	if !strings.HasPrefix(got, "deleted 000000000000000a\nskipping: 0000000000000fff: ") ||
-		!strings.HasSuffix(got, "1 messages moved to the trash\n") {
-		t.Errorf("delete: got %q", got)
+	out, errOut, err := tr.run("delete", "000000000000000a", "0000000000000fff")
+	if err == nil || err.Error() != "1 of 2 failed" ||
+		out != "deleted 000000000000000a\n1 messages moved to the trash\n" ||
+		!strings.HasPrefix(errOut, "skipping: 0000000000000fff: ") {
+		t.Errorf("delete: got %v, stdout %q, stderr %q", err, out, errOut)
 	}
 	if got := tr.ok("list", "label:receipts"); got != "0 messages\n" {
 		t.Errorf("list after delete: got %q", got)

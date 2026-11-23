@@ -184,8 +184,8 @@ func TestEach(t *testing.T) {
 			got = append(got, v)
 			return nil
 		})
-	if err != nil {
-		t.Fatal(err)
+	if err == nil || err.Error() != "5 of 250 failed" {
+		t.Errorf("each: got err %v", err)
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("each: got %d results, want %d in order", len(got), len(want))

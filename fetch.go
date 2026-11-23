@@ -148,9 +148,10 @@ func parseMessage(raw []byte) (*msgformat.Entity, error) {
 	return m, nil
 }
 
-func each[T any](ctx context.Context, out io.Writer, ids []string,
+func each[T any](ctx context.Context, errOut io.Writer, ids []string,
 	fetch func(ctx context.Context, id string) (T, error), fn func(id string, v T) error) error {
 
+	failed := 0
 	for start := 0; start < len(ids); start += fetchChunk {
 		chunk := ids[start:min(start+fetchChunk, len(ids))]
 		vals := make([]T, len(chunk))
@@ -171,13 +172,17 @@ func each[T any](ctx context.Context, out io.Writer, ids []string,
 
 		for i, id := range chunk {
 			if errs[i] != nil {
-				fmt.Fprintf(out, "skipping: %s: %s\n", id, errs[i])
+				fmt.Fprintf(errOut, "skipping: %s: %s\n", id, errs[i])
+				failed += 1
 				continue
 			}
 			if err := fn(id, vals[i]); err != nil {
 				return err
 			}
 		}
+	}
+	if failed > 0 {
+		return fmt.Errorf("%d of %d failed", failed, len(ids))
 	}
 	return nil
 }

@@ -91,7 +91,7 @@ func list(ctx context.Context, cfg *config, opts listOptions, args []string) err
 	}
 
 	cnt := 0
-	err = each(ctx, cfg.out, ids,
+	err = each(ctx, cfg.errOut, ids,
 		func(ctx context.Context, id string) (*gmail.Message, error) {
 			return getMetadata(ctx, svc, id)
 		},
@@ -100,14 +100,11 @@ func list(ctx context.Context, cfg *config, opts listOptions, args []string) err
 			cnt += 1
 			return nil
 		})
-	if err != nil {
-		return err
-	}
 
 	fmt.Fprintf(cfg.out, "%d messages", cnt)
 	if more {
 		fmt.Fprint(cfg.out, " (more match; use -n to see more)")
 	}
 	fmt.Fprintln(cfg.out)
-	return nil
+	return err
 }

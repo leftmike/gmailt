@@ -21,7 +21,7 @@ func trash(ctx context.Context, cfg *config, args []string) error {
 
 	cnt := 0
 	err = recordChanges(ctx, cfg, svc, ids, nil, func() error {
-		return each(ctx, cfg.out, ids,
+		return each(ctx, cfg.errOut, ids,
 			func(ctx context.Context, id string) (*gmail.Message, error) {
 				return trashMessage(ctx, svc, id)
 			},
@@ -31,10 +31,7 @@ func trash(ctx context.Context, cfg *config, args []string) error {
 				return nil
 			})
 	})
-	if err != nil {
-		return err
-	}
 
 	fmt.Fprintf(cfg.out, "%d messages moved to the trash\n", cnt)
-	return nil
+	return err
 }

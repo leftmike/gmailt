@@ -92,7 +92,7 @@ func labels(ctx context.Context, cfg *config, args []string) error {
 	}
 
 	fmt.Fprintf(cfg.out, "%8s %8s  %s\n", "messages", "unread", "label")
-	return each(ctx, cfg.out, ids,
+	return each(ctx, cfg.errOut, ids,
 		func(ctx context.Context, id string) (*gmail.Label, error) {
 			return retry(ctx, func() (*gmail.Label, error) {
 				return svc.Users.Labels.Get("me", id).Context(ctx).Do()

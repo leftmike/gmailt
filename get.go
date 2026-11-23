@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"flag"
@@ -109,7 +110,7 @@ func get(ctx context.Context, cfg *config, opts getOptions, args []string) error
 		if err != nil {
 			return err
 		}
-		return each(ctx, cfg.out, ids,
+		return each(ctx, cfg.errOut, ids,
 			func(ctx context.Context, id string) (*gmail.Message, error) {
 				return getMetadata(ctx, svc, id)
 			},
@@ -122,15 +123,21 @@ func get(ctx context.Context, cfg *config, opts getOptions, args []string) error
 			})
 	}
 
-	return each(ctx, cfg.out, ids,
+	return each(ctx, cfg.errOut, ids,
 		func(ctx context.Context, id string) ([]byte, error) {
-			return getRaw(ctx, svc, id)
-		},
-		func(id string, raw []byte) error {
-			separator(id)
-			if err := printMessage(cfg.out, opts.format, raw); err != nil {
-				fmt.Fprintf(cfg.out, "skipping: %s: %s\n", id, err)
+			raw, err := getRaw(ctx, svc, id)
+			if err != nil {
+				return nil, err
 			}
-			return nil
+			var buf bytes.Buffer
+			if err := printMessage(&buf, opts.format, raw); err != nil {
+				return nil, err
+			}
+			return buf.Bytes(), nil
+		},
+		func(id string, text []byte) error {
+			separator(id)
+			_, err := cfg.out.Write(text)
+			return err
 		})
 }
