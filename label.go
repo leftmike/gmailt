@@ -95,6 +95,7 @@ func label(cfg *config, args []string) {
 	if len(missing) > 0 && !labelCreate {
 		fatal(fmt.Errorf("no such label: %s (use -create to create it)", strings.Join(missing, ", ")))
 	}
+	var created []string
 	for _, name := range missing {
 		l, err := createLabel(ctx, svc, name)
 		if err != nil {
@@ -102,9 +103,12 @@ func label(cfg *config, args []string) {
 		}
 		fmt.Printf("created label %s\n", l.Name)
 		addLabels = append(addLabels, l)
+		created = append(created, l.Name)
 	}
 
-	err = modifyLabels(ctx, svc, ids, labelIDs(addLabels), labelIDs(removeLabels))
+	err = recordChanges(ctx, cfg, svc, ids, created, func() error {
+		return modifyLabels(ctx, svc, ids, labelIDs(addLabels), labelIDs(removeLabels))
+	})
 	if err != nil {
 		fatal(err)
 	}

@@ -18,15 +18,17 @@ func trash(cfg *config, args []string) {
 	svc, ids := selectIDs(ctx, cfg, args, "<id>... | <query>...")
 
 	cnt := 0
-	err := each(ctx, ids,
-		func(ctx context.Context, id string) (*gmail.Message, error) {
-			return trashMessage(ctx, svc, id)
-		},
-		func(id string, m *gmail.Message) error {
-			fmt.Printf("deleted %s\n", id)
-			cnt += 1
-			return nil
-		})
+	err := recordChanges(ctx, cfg, svc, ids, nil, func() error {
+		return each(ctx, ids,
+			func(ctx context.Context, id string) (*gmail.Message, error) {
+				return trashMessage(ctx, svc, id)
+			},
+			func(id string, m *gmail.Message) error {
+				fmt.Printf("deleted %s\n", id)
+				cnt += 1
+				return nil
+			})
+	})
 	if err != nil {
 		fatal(err)
 	}

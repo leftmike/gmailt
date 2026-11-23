@@ -14,6 +14,7 @@ import (
 type config struct {
 	Credentials string `hcl:"credentials,optional"`
 	Token       string `hcl:"token,optional"`
+	History     string `hcl:"history,optional"`
 }
 
 func configDir() string {
@@ -68,6 +69,7 @@ func loadConfig(fs *flag.FlagSet, args []string) (*config, []string) {
 	fs.StringVar(&configFile, "config", "", "HCL config file")
 	fs.String("credentials", "", "OAuth client credentials file")
 	fs.String("token", "", "OAuth token file")
+	fs.String("history", "", "history file used by undo")
 	fs.Parse(args)
 
 	var cfg *config
@@ -93,6 +95,8 @@ func loadConfig(fs *flag.FlagSet, args []string) (*config, []string) {
 			cfg.Credentials = f.Value.String()
 		case "token":
 			cfg.Token = f.Value.String()
+		case "history":
+			cfg.History = f.Value.String()
 		}
 	})
 
@@ -102,8 +106,12 @@ func loadConfig(fs *flag.FlagSet, args []string) (*config, []string) {
 	if cfg.Token == "" {
 		cfg.Token = filepath.Join(configDir(), "token.json")
 	}
+	if cfg.History == "" {
+		cfg.History = filepath.Join(configDir(), "history.jsonl")
+	}
 	cfg.Credentials = expandHome(cfg.Credentials)
 	cfg.Token = expandHome(cfg.Token)
+	cfg.History = expandHome(cfg.History)
 
 	return cfg, fs.Args()
 }
@@ -111,4 +119,5 @@ func loadConfig(fs *flag.FlagSet, args []string) (*config, []string) {
 func showConfig(cfg *config, args []string) {
 	fmt.Printf("credentials: %s\n", cfg.Credentials)
 	fmt.Printf("token:       %s\n", cfg.Token)
+	fmt.Printf("history:     %s\n", cfg.History)
 }

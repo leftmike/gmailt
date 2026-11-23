@@ -40,6 +40,8 @@ var (
 		"archive": {run: archive, help: "remove messages from the inbox by id or Gmail search query"},
 		"delete":  {run: trash, help: "move messages to the trash by id or Gmail search query"},
 		"trash":   {run: trash, help: "same as delete"},
+		"undo":    {run: undo, help: "undo the most recent (or <n>th) delete, archive, or label"},
+		"history": {run: history, help: "show the history of commands that undo can reverse"},
 	}
 )
 

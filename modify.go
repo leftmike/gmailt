@@ -29,7 +29,10 @@ func modifyLabels(ctx context.Context, svc *gmail.Service, ids []string, add, re
 func archive(cfg *config, args []string) {
 	ctx := context.Background()
 	svc, ids := selectIDs(ctx, cfg, args, "<id>... | <query>...")
-	if err := modifyLabels(ctx, svc, ids, nil, []string{"INBOX"}); err != nil {
+	err := recordChanges(ctx, cfg, svc, ids, nil, func() error {
+		return modifyLabels(ctx, svc, ids, nil, []string{"INBOX"})
+	})
+	if err != nil {
 		fatal(err)
 	}
 	fmt.Printf("%d messages archived\n", len(ids))
