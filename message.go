@@ -24,9 +24,9 @@ func messageFromEntity(entity *msgformat.Entity) (*message, error) {
 		return nil, err
 	}
 
-	subject, err := wordDecoder.DecodeHeader(entity.Header.Get("Subject"))
-	if err != nil {
-		return nil, err
+	subject := entity.Header.Get("Subject")
+	if decoded, err := wordDecoder.DecodeHeader(subject); err == nil {
+		subject = decoded
 	}
 
 	return &message{

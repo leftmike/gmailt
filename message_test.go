@@ -41,6 +41,7 @@ func TestFormatBody(t *testing.T) {
 			"[text/html; charset=shift_jis, base64, 16 bytes]\n[application/pdf, base64, 5 bytes]"},
 		{"nested.eml", "nested",
 			"See the attached report.\n[text/html; charset=utf-8, 31 bytes]\n[application/pdf, base64, 4 bytes]"},
+		{"unknown-charset-subject.eml", "=?x-unknown?q?hello?=", "body text\r\n"},
 		{"unknown-encoding.eml", "unknown encoding", "hello there\r\n"},
 	}
 	for _, c := range cases {
