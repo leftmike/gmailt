@@ -26,7 +26,11 @@ func parseIDArgs(args []string) ([]string, string, error) {
 	case len(args):
 		return ids, "", nil
 	case 0:
-		return nil, strings.Join(args, " "), nil
+		query := strings.TrimSpace(strings.Join(args, " "))
+		if query == "" {
+			return nil, "", errors.New("empty query")
+		}
+		return nil, query, nil
 	default:
 		return nil, "", errors.New("arguments must be all message ids or a query, not both")
 	}

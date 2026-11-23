@@ -26,4 +26,13 @@ func TestParseIDArgs(t *testing.T) {
 	if _, _, err := parseIDArgs([]string{"1a2046b535d465fe", "from:alice"}); err == nil {
 		t.Error("parseIDArgs mixed: expected error")
 	}
+
+	if _, query, err := parseIDArgs([]string{"", " from:alice "}); err != nil || query != "from:alice" {
+		t.Errorf("parseIDArgs trim: got %q, %v", query, err)
+	}
+	for _, args := range [][]string{{""}, {" "}, {"", "\t"}} {
+		if _, _, err := parseIDArgs(args); err == nil || err.Error() != "empty query" {
+			t.Errorf("parseIDArgs(%q): got %v, want empty query", args, err)
+		}
+	}
 }

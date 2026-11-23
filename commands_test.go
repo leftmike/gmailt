@@ -435,6 +435,11 @@ func TestArchiveUndo(t *testing.T) {
 	tr.fails("no such history entry: 9", "undo", "9")
 	tr.usage("undo", "1", "2")
 	tr.usage("archive")
+	tr.fails("empty query", "archive", " ")
+	tr.fails("empty query", "delete", "")
+	if got := tr.f.labelsOf("000000000000000c"); !slices.Equal(got, []string{"INBOX", "UNREAD"}) {
+		t.Errorf("labels changed by empty query: %v", got)
+	}
 }
 
 func TestLabelUndo(t *testing.T) {

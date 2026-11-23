@@ -67,8 +67,10 @@ func TestFormatListLine(t *testing.T) {
 }
 
 func TestListQuery(t *testing.T) {
-	if got := listQuery(nil); got != "in:inbox" {
-		t.Errorf("listQuery default: got %q", got)
+	for _, args := range [][]string{nil, {""}, {" ", "\t"}} {
+		if got := listQuery(args); got != "in:inbox" {
+			t.Errorf("listQuery(%q): got %q", args, got)
+		}
 	}
 	if got := listQuery([]string{"-in:inbox", "from:alice"}); got != "-in:inbox from:alice" {
 		t.Errorf("listQuery: got %q", got)

@@ -70,10 +70,11 @@ func formatListLine(m *gmail.Message) string {
 }
 
 func listQuery(args []string) string {
-	if len(args) == 0 {
+	query := strings.TrimSpace(strings.Join(args, " "))
+	if query == "" {
 		return "in:inbox"
 	}
-	return strings.Join(args, " ")
+	return query
 }
 
 func list(ctx context.Context, cfg *config, opts listOptions, args []string) error {
