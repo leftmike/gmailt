@@ -33,6 +33,33 @@ func labelNames(ctx context.Context, svc *gmail.Service) (map[string]string, err
 	return names, nil
 }
 
+func resolveLabels(all []*gmail.Label, names []string) ([]*gmail.Label, []string) {
+	byName := map[string]*gmail.Label{}
+	for _, l := range all {
+		byName[strings.ToLower(l.Name)] = l
+	}
+	var found []*gmail.Label
+	var missing []string
+	for _, name := range names {
+		if l, ok := byName[strings.ToLower(name)]; ok {
+			found = append(found, l)
+		} else {
+			missing = append(missing, name)
+		}
+	}
+	return found, missing
+}
+
+func createLabel(ctx context.Context, svc *gmail.Service, name string) (*gmail.Label, error) {
+	return retry(ctx, func() (*gmail.Label, error) {
+		return svc.Users.Labels.Create("me", &gmail.Label{
+			Name:                  name,
+			LabelListVisibility:   "labelShow",
+			MessageListVisibility: "show",
+		}).Context(ctx).Do()
+	})
+}
+
 func sortLabels(all []*gmail.Label) {
 	slices.SortFunc(all, func(a, b *gmail.Label) int {
 		if (a.Type == "system") != (b.Type == "system") {
