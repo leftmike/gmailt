@@ -116,7 +116,8 @@ func TestRevertChange(t *testing.T) {
 
 	c := labelChange{IDs: []string{"a", "b"}, Added: []string{"TRASH", "STARRED"},
 		Removed: []string{"INBOX"}}
-	if err := revertChange(context.Background(), io.Discard, svc, c); err != nil {
+	cfg := &config{out: io.Discard, errOut: io.Discard}
+	if _, err := revertChange(context.Background(), cfg, svc, c); err != nil {
 		t.Fatal(err)
 	}
 	slices.Sort(untrashed)

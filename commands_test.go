@@ -496,6 +496,32 @@ func TestDeleteUndo(t *testing.T) {
 	}
 }
 
+func TestUndoMissingMessage(t *testing.T) {
+	tr := newTestRun(t)
+
+	tr.ok("delete", "000000000000000a", "000000000000000b")
+	tr.f.messages = slices.DeleteFunc(tr.f.messages, func(m *fakeMessage) bool {
+		return m.id == "000000000000000a"
+	})
+
+	out, errOut, err := tr.run("undo")
+	if err != nil {
+		t.Fatalf("undo: %v", err)
+	}
+	if errOut != "gmailt undo: warning: 000000000000000a no longer exists\n" {
+		t.Errorf("undo stderr: got %q", errOut)
+	}
+	if !strings.HasPrefix(out, "1 messages restored: ^TRASH\n") {
+		t.Errorf("undo: got %q", out)
+	}
+	if got := tr.f.labelsOf("000000000000000b"); !slices.Equal(got, []string{"INBOX", "STARRED"}) {
+		t.Errorf("untrashed labels: got %v", got)
+	}
+	if got := tr.ok("history"); !strings.HasSuffix(got, "(undone)\n") {
+		t.Errorf("history after undo: got %q", got)
+	}
+}
+
 func TestLabelsCommand(t *testing.T) {
 	tr := newTestRun(t)
 	want := lines(

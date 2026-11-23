@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/fs"
 	"maps"
+	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
@@ -16,6 +17,7 @@ import (
 	"time"
 
 	"google.golang.org/api/gmail/v1"
+	"google.golang.org/api/googleapi"
 )
 
 const historyDays = 30
@@ -250,53 +252,74 @@ func recordChanges(ctx context.Context, cfg *config, svc *gmail.Service, ids, cr
 	return changeErr
 }
 
-func perMessage(ctx context.Context, out io.Writer, ids []string,
-	call func(ctx context.Context, id string) (*gmail.Message, error)) error {
+func notFound(err error) bool {
+	var gerr *googleapi.Error
+	return errors.As(err, &gerr) && gerr.Code == http.StatusNotFound
+}
 
-	ok := 0
-	err := each(ctx, out, ids, call, func(id string, m *gmail.Message) error {
-		ok += 1
-		return nil
-	})
+func perMessage(ctx context.Context, cfg *config, ids []string,
+	call func(ctx context.Context, id string) (*gmail.Message, error)) ([]string, error) {
+
+	var found []string
+	gone := 0
+	err := each(ctx, cfg.out, ids,
+		func(ctx context.Context, id string) (*gmail.Message, error) {
+			m, err := call(ctx, id)
+			if notFound(err) {
+				return nil, nil
+			}
+			return m, err
+		},
+		func(id string, m *gmail.Message) error {
+			if m == nil {
+				warn(cfg, fmt.Errorf("%s no longer exists", id))
+				gone += 1
+			} else {
+				found = append(found, id)
+			}
+			return nil
+		})
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if n := len(ids) - ok; n > 0 {
-		return fmt.Errorf("%d of %d messages failed", n, len(ids))
+	if n := len(ids) - len(found) - gone; n > 0 {
+		return nil, fmt.Errorf("%d of %d messages failed", n, len(ids))
 	}
-	return nil
+	return found, nil
 }
 
 func without(labels []string, label string) []string {
 	return slices.DeleteFunc(slices.Clone(labels), func(l string) bool { return l == label })
 }
 
-func revertChange(ctx context.Context, out io.Writer, svc *gmail.Service, c labelChange) error {
+func revertChange(ctx context.Context, cfg *config, svc *gmail.Service, c labelChange) ([]string, error) {
+	ids := c.IDs
 	add, remove := c.Removed, c.Added
+	var err error
 	if slices.Contains(remove, "TRASH") {
-		err := perMessage(ctx, out, c.IDs, func(ctx context.Context, id string) (*gmail.Message, error) {
+		ids, err = perMessage(ctx, cfg, ids, func(ctx context.Context, id string) (*gmail.Message, error) {
 			return retry(ctx, func() (*gmail.Message, error) {
 				return svc.Users.Messages.Untrash("me", id).Context(ctx).Do()
 			})
 		})
 		if err != nil {
-			return err
+			return nil, err
 		}
 		remove = without(remove, "TRASH")
 	}
 	if slices.Contains(add, "TRASH") {
-		err := perMessage(ctx, out, c.IDs, func(ctx context.Context, id string) (*gmail.Message, error) {
+		ids, err = perMessage(ctx, cfg, ids, func(ctx context.Context, id string) (*gmail.Message, error) {
 			return trashMessage(ctx, svc, id)
 		})
 		if err != nil {
-			return err
+			return nil, err
 		}
 		add = without(add, "TRASH")
 	}
-	if len(add) == 0 && len(remove) == 0 {
-		return nil
+	if len(ids) == 0 || (len(add) == 0 && len(remove) == 0) {
+		return ids, nil
 	}
-	return modifyLabels(ctx, svc, c.IDs, add, remove)
+	return ids, modifyLabels(ctx, svc, ids, add, remove)
 }
 
 func findUndo(entries []historyEntry, undone map[int]bool, args []string) (*historyEntry, error) {
@@ -359,10 +382,11 @@ func undo(ctx context.Context, cfg *config, args []string) error {
 	}
 
 	for _, c := range e.Changes {
-		if err := revertChange(ctx, cfg.out, svc, c); err != nil {
+		ids, err := revertChange(ctx, cfg, svc, c)
+		if err != nil {
 			return err
 		}
-		fmt.Fprintf(cfg.out, "%d messages restored: %s\n", len(c.IDs),
+		fmt.Fprintf(cfg.out, "%d messages restored: %s\n", len(ids),
 			describeChanges(namedLabels(names, c.Removed), namedLabels(names, c.Added)))
 	}
 	for _, name := range e.Created {
