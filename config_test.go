@@ -30,7 +30,10 @@ func TestLoadConfig(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Chdir(t.TempDir())
 
-	cfg, args := loadConfig(flag.NewFlagSet("test", flag.ContinueOnError), []string{"a", "b"})
+	cfg, args, err := loadConfig(flag.NewFlagSet("test", flag.ContinueOnError), []string{"a", "b"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	dir := filepath.Join(home, ".gmailt")
 	if cfg.Credentials != filepath.Join(dir, "credentials.json") ||
 		cfg.Token != filepath.Join(dir, "token.json") ||
@@ -45,7 +48,11 @@ func TestLoadConfig(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "gmailt.hcl"), []byte(hcl), 0600); err != nil {
 		t.Fatal(err)
 	}
-	cfg, _ = loadConfig(flag.NewFlagSet("test", flag.ContinueOnError), []string{"-token", "flag.json"})
+	cfg, _, err = loadConfig(flag.NewFlagSet("test", flag.ContinueOnError),
+		[]string{"-token", "flag.json"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if cfg.Credentials != filepath.Join(home, "creds.json") || cfg.Token != "flag.json" ||
 		cfg.History != filepath.Join(home, "h.jsonl") {
 		t.Errorf("file and flags: got %+v", cfg)
@@ -55,9 +62,18 @@ func TestLoadConfig(t *testing.T) {
 	if err := os.WriteFile(other, []byte("token = \"other.json\"\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	cfg, _ = loadConfig(flag.NewFlagSet("test", flag.ContinueOnError), []string{"-config", other})
+	cfg, _, err = loadConfig(flag.NewFlagSet("test", flag.ContinueOnError), []string{"-config", other})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if cfg.Token != "other.json" || cfg.Credentials != filepath.Join(dir, "credentials.json") {
 		t.Errorf("-config: got %+v", cfg)
+	}
+
+	_, _, err = loadConfig(flag.NewFlagSet("test", flag.ContinueOnError),
+		[]string{"-config", filepath.Join(t.TempDir(), "none.hcl")})
+	if err == nil {
+		t.Error("-config missing file: expected error")
 	}
 }
 

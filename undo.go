@@ -221,10 +221,6 @@ func commandLine(args []string) string {
 	return strings.Join(words, " ")
 }
 
-func warn(err error) {
-	fmt.Fprintf(os.Stderr, "%s %s: warning: %s\n", os.Args[0], os.Args[1], err)
-}
-
 func recordChanges(ctx context.Context, cfg *config, svc *gmail.Service, ids, created []string,
 	change func() error) error {
 
@@ -233,7 +229,7 @@ func recordChanges(ctx context.Context, cfg *config, svc *gmail.Service, ids, cr
 	})
 	changeErr := change()
 	if err != nil {
-		warn(fmt.Errorf("not saved to history: %w", err))
+		warn(cfg, fmt.Errorf("not saved to history: %w", err))
 		return changeErr
 	}
 
@@ -242,23 +238,23 @@ func recordChanges(ctx context.Context, cfg *config, svc *gmail.Service, ids, cr
 		changes := netChanges(records, ids)
 		if len(changes) > 0 || len(created) > 0 {
 			_, err = appendHistory(cfg.History, historyEntry{
-				Command: commandLine(os.Args[1:]),
+				Command: cfg.command,
 				Changes: changes,
 				Created: created,
 			}, time.Now())
 		}
 	}
 	if err != nil {
-		warn(fmt.Errorf("not saved to history: %w", err))
+		warn(cfg, fmt.Errorf("not saved to history: %w", err))
 	}
 	return changeErr
 }
 
-func perMessage(ctx context.Context, ids []string,
+func perMessage(ctx context.Context, out io.Writer, ids []string,
 	call func(ctx context.Context, id string) (*gmail.Message, error)) error {
 
 	ok := 0
-	err := each(ctx, ids, call, func(id string, m *gmail.Message) error {
+	err := each(ctx, out, ids, call, func(id string, m *gmail.Message) error {
 		ok += 1
 		return nil
 	})
@@ -275,10 +271,10 @@ func without(labels []string, label string) []string {
 	return slices.DeleteFunc(slices.Clone(labels), func(l string) bool { return l == label })
 }
 
-func revertChange(ctx context.Context, svc *gmail.Service, c labelChange) error {
+func revertChange(ctx context.Context, out io.Writer, svc *gmail.Service, c labelChange) error {
 	add, remove := c.Removed, c.Added
 	if slices.Contains(remove, "TRASH") {
-		err := perMessage(ctx, c.IDs, func(ctx context.Context, id string) (*gmail.Message, error) {
+		err := perMessage(ctx, out, c.IDs, func(ctx context.Context, id string) (*gmail.Message, error) {
 			return retry(ctx, func() (*gmail.Message, error) {
 				return svc.Users.Messages.Untrash("me", id).Context(ctx).Do()
 			})
@@ -289,7 +285,7 @@ func revertChange(ctx context.Context, svc *gmail.Service, c labelChange) error 
 		remove = without(remove, "TRASH")
 	}
 	if slices.Contains(add, "TRASH") {
-		err := perMessage(ctx, c.IDs, func(ctx context.Context, id string) (*gmail.Message, error) {
+		err := perMessage(ctx, out, c.IDs, func(ctx context.Context, id string) (*gmail.Message, error) {
 			return trashMessage(ctx, svc, id)
 		})
 		if err != nil {
@@ -340,46 +336,45 @@ func namedLabels(names map[string]string, ids []string) []*gmail.Label {
 	return labels
 }
 
-func undo(cfg *config, args []string) {
+func undo(ctx context.Context, cfg *config, args []string) error {
 	if len(args) > 1 {
-		fmt.Fprintf(os.Stderr, "usage: %s %s [<n>]\n", os.Args[0], os.Args[1])
-		os.Exit(1)
+		return usageError("[<n>]")
 	}
 	entries, undone, err := readHistory(cfg.History)
 	if err != nil {
-		fatal(err)
+		return err
 	}
 	e, err := findUndo(entries, undone, args)
 	if err != nil {
-		fatal(err)
+		return err
 	}
 
-	ctx := context.Background()
 	svc, err := cfg.newService(ctx)
 	if err != nil {
-		fatal(err)
+		return err
 	}
 	names, err := labelNames(ctx, svc)
 	if err != nil {
-		fatal(err)
+		return err
 	}
 
 	for _, c := range e.Changes {
-		if err := revertChange(ctx, svc, c); err != nil {
-			fatal(err)
+		if err := revertChange(ctx, cfg.out, svc, c); err != nil {
+			return err
 		}
-		fmt.Printf("%d messages restored: %s\n", len(c.IDs),
+		fmt.Fprintf(cfg.out, "%d messages restored: %s\n", len(c.IDs),
 			describeChanges(namedLabels(names, c.Removed), namedLabels(names, c.Added)))
 	}
 	for _, name := range e.Created {
-		fmt.Printf("label %s was created by this command and is left in place\n", name)
+		fmt.Fprintf(cfg.out, "label %s was created by this command and is left in place\n", name)
 	}
 	err = writeHistory(cfg.History, os.O_WRONLY|os.O_CREATE|os.O_APPEND,
 		[]historyEntry{{Undone: e.N}})
 	if err != nil {
-		fatal(err)
+		return err
 	}
-	fmt.Printf("undid %d: %s\n", e.N, e.Command)
+	fmt.Fprintf(cfg.out, "undid %d: %s\n", e.N, e.Command)
+	return nil
 }
 
 func formatHistoryLine(e historyEntry, undone bool) string {
@@ -391,16 +386,16 @@ func formatHistoryLine(e historyEntry, undone bool) string {
 	return s
 }
 
-func history(cfg *config, args []string) {
+func history(ctx context.Context, cfg *config, args []string) error {
 	if len(args) != 0 {
-		fmt.Fprintf(os.Stderr, "usage: %s %s\n", os.Args[0], os.Args[1])
-		os.Exit(1)
+		return usageError("")
 	}
 	entries, undone, err := readHistory(cfg.History)
 	if err != nil {
-		fatal(err)
+		return err
 	}
 	for _, e := range slices.Backward(entries) {
-		fmt.Println(formatHistoryLine(e, undone[e.N]))
+		fmt.Fprintln(cfg.out, formatHistoryLine(e, undone[e.N]))
 	}
+	return nil
 }

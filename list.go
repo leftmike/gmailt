@@ -15,12 +15,16 @@ import (
 	"google.golang.org/api/gmail/v1"
 )
 
-var (
-	listMax int
-)
+type listOptions struct {
+	max int
+}
 
-func listFlags(fs *flag.FlagSet) {
-	fs.IntVar(&listMax, "n", 50, "maximum number of messages to list; 0 for no limit")
+func listCmd(fs *flag.FlagSet) runFunc {
+	var opts listOptions
+	fs.IntVar(&opts.max, "n", 50, "maximum number of messages to list; 0 for no limit")
+	return func(ctx context.Context, cfg *config, args []string) error {
+		return list(ctx, cfg, opts, args)
+	}
 }
 
 var wordDecoder = &mime.WordDecoder{CharsetReader: msgformat.CharsetReader}
@@ -72,40 +76,38 @@ func listQuery(args []string) string {
 	return strings.Join(args, " ")
 }
 
-func list(cfg *config, args []string) {
-	if listMax < 0 {
-		fatal(errors.New("-n must be 0 or more"))
+func list(ctx context.Context, cfg *config, opts listOptions, args []string) error {
+	if opts.max < 0 {
+		return errors.New("-n must be 0 or more")
 	}
-	q := listQuery(args)
-
-	ctx := context.Background()
 	svc, err := cfg.newService(ctx)
 	if err != nil {
-		fatal(err)
+		return err
 	}
 
-	ids, more, err := listIDs(ctx, svc, q, listMax)
+	ids, more, err := listIDs(ctx, svc, listQuery(args), opts.max)
 	if err != nil {
-		fatal(err)
+		return err
 	}
 
 	cnt := 0
-	err = each(ctx, ids,
+	err = each(ctx, cfg.out, ids,
 		func(ctx context.Context, id string) (*gmail.Message, error) {
 			return getMetadata(ctx, svc, id)
 		},
 		func(id string, m *gmail.Message) error {
-			fmt.Println(formatListLine(m))
+			fmt.Fprintln(cfg.out, formatListLine(m))
 			cnt += 1
 			return nil
 		})
 	if err != nil {
-		fatal(err)
+		return err
 	}
 
-	fmt.Printf("%d messages", cnt)
+	fmt.Fprintf(cfg.out, "%d messages", cnt)
 	if more {
-		fmt.Print(" (more match; use -n to see more)")
+		fmt.Fprint(cfg.out, " (more match; use -n to see more)")
 	}
-	fmt.Println()
+	fmt.Fprintln(cfg.out)
+	return nil
 }

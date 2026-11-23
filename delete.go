@@ -13,25 +13,28 @@ func trashMessage(ctx context.Context, svc *gmail.Service, id string) (*gmail.Me
 	})
 }
 
-func trash(cfg *config, args []string) {
-	ctx := context.Background()
-	svc, ids := selectIDs(ctx, cfg, args, "<id>... | <query>...")
+func trash(ctx context.Context, cfg *config, args []string) error {
+	svc, ids, err := selectIDs(ctx, cfg, args, "<id>... | <query>...")
+	if err != nil {
+		return err
+	}
 
 	cnt := 0
-	err := recordChanges(ctx, cfg, svc, ids, nil, func() error {
-		return each(ctx, ids,
+	err = recordChanges(ctx, cfg, svc, ids, nil, func() error {
+		return each(ctx, cfg.out, ids,
 			func(ctx context.Context, id string) (*gmail.Message, error) {
 				return trashMessage(ctx, svc, id)
 			},
 			func(id string, m *gmail.Message) error {
-				fmt.Printf("deleted %s\n", id)
+				fmt.Fprintf(cfg.out, "deleted %s\n", id)
 				cnt += 1
 				return nil
 			})
 	})
 	if err != nil {
-		fatal(err)
+		return err
 	}
 
-	fmt.Printf("%d messages moved to the trash\n", cnt)
+	fmt.Fprintf(cfg.out, "%d messages moved to the trash\n", cnt)
+	return nil
 }

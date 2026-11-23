@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"os"
 	"strings"
 
 	"google.golang.org/api/gmail/v1"
@@ -12,12 +11,16 @@ import (
 
 const labelUsage = "[-create] +<label>|^<label>... <id>... | <query>..."
 
-var (
-	labelCreate bool
-)
+type labelOptions struct {
+	create bool
+}
 
-func labelFlags(fs *flag.FlagSet) {
-	fs.BoolVar(&labelCreate, "create", false, "create labels added with + that don't exist")
+func labelCmd(fs *flag.FlagSet) runFunc {
+	var opts labelOptions
+	fs.BoolVar(&opts.create, "create", false, "create labels added with + that don't exist")
+	return func(ctx context.Context, cfg *config, args []string) error {
+		return label(ctx, cfg, opts, args)
+	}
 }
 
 func parseLabelArgs(args []string) ([]string, []string, []string, error) {
@@ -70,38 +73,39 @@ func describeChanges(add, remove []*gmail.Label) string {
 	return strings.Join(changes, " ")
 }
 
-func label(cfg *config, args []string) {
+func label(ctx context.Context, cfg *config, opts labelOptions, args []string) error {
 	add, remove, rest, err := parseLabelArgs(args)
 	if err != nil {
-		fatal(err)
+		return err
 	}
 	if len(add) == 0 && len(remove) == 0 {
-		fmt.Fprintf(os.Stderr, "usage: %s %s %s\n", os.Args[0], os.Args[1], labelUsage)
-		os.Exit(1)
+		return usageError(labelUsage)
 	}
 
-	ctx := context.Background()
-	svc, ids := selectIDs(ctx, cfg, rest, labelUsage)
+	svc, ids, err := selectIDs(ctx, cfg, rest, labelUsage)
+	if err != nil {
+		return err
+	}
 
 	all, err := listLabels(ctx, svc)
 	if err != nil {
-		fatal(err)
+		return err
 	}
 	addLabels, missing := resolveLabels(all, add)
 	removeLabels, missingRemove := resolveLabels(all, remove)
 	if len(missingRemove) > 0 {
-		fatal(fmt.Errorf("no such label: %s", strings.Join(missingRemove, ", ")))
+		return fmt.Errorf("no such label: %s", strings.Join(missingRemove, ", "))
 	}
-	if len(missing) > 0 && !labelCreate {
-		fatal(fmt.Errorf("no such label: %s (use -create to create it)", strings.Join(missing, ", ")))
+	if len(missing) > 0 && !opts.create {
+		return fmt.Errorf("no such label: %s (use -create to create it)", strings.Join(missing, ", "))
 	}
 	var created []string
 	for _, name := range missing {
 		l, err := createLabel(ctx, svc, name)
 		if err != nil {
-			fatal(err)
+			return err
 		}
-		fmt.Printf("created label %s\n", l.Name)
+		fmt.Fprintf(cfg.out, "created label %s\n", l.Name)
 		addLabels = append(addLabels, l)
 		created = append(created, l.Name)
 	}
@@ -110,7 +114,8 @@ func label(cfg *config, args []string) {
 		return modifyLabels(ctx, svc, ids, labelIDs(addLabels), labelIDs(removeLabels))
 	})
 	if err != nil {
-		fatal(err)
+		return err
 	}
-	fmt.Printf("%d messages updated: %s\n", len(ids), describeChanges(addLabels, removeLabels))
+	fmt.Fprintf(cfg.out, "%d messages updated: %s\n", len(ids), describeChanges(addLabels, removeLabels))
+	return nil
 }

@@ -9,7 +9,6 @@ import (
 	"io"
 	"math/rand/v2"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -29,10 +28,9 @@ const (
 )
 
 var (
-	retryDelay                = time.Second
-	limiter                   = rate.NewLimiter(40, 10)
-	metadataHeaders           = []string{"From", "Subject", "Date"}
-	skipOutput      io.Writer = os.Stdout
+	retryDelay      = time.Second
+	limiter         = rate.NewLimiter(40, 10)
+	metadataHeaders = []string{"From", "Subject", "Date"}
 )
 
 func retryable(err error) bool {
@@ -149,8 +147,8 @@ func parseMessage(raw []byte) (*msgformat.Entity, error) {
 	return m, nil
 }
 
-func each[T any](ctx context.Context, ids []string, fetch func(ctx context.Context, id string) (T, error),
-	fn func(id string, v T) error) error {
+func each[T any](ctx context.Context, out io.Writer, ids []string,
+	fetch func(ctx context.Context, id string) (T, error), fn func(id string, v T) error) error {
 
 	for start := 0; start < len(ids); start += fetchChunk {
 		chunk := ids[start:min(start+fetchChunk, len(ids))]
@@ -172,7 +170,7 @@ func each[T any](ctx context.Context, ids []string, fetch func(ctx context.Conte
 
 		for i, id := range chunk {
 			if errs[i] != nil {
-				fmt.Fprintf(skipOutput, "skipping: %s: %s\n", id, errs[i])
+				fmt.Fprintf(out, "skipping: %s: %s\n", id, errs[i])
 				continue
 			}
 			if err := fn(id, vals[i]); err != nil {

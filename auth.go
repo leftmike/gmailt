@@ -22,12 +22,16 @@ import (
 	"google.golang.org/api/option"
 )
 
-var (
-	authRevoke bool
-)
+type authOptions struct {
+	revoke bool
+}
 
-func authFlags(fs *flag.FlagSet) {
-	fs.BoolVar(&authRevoke, "revoke", false, "revoke and delete the saved token")
+func authCmd(fs *flag.FlagSet) runFunc {
+	var opts authOptions
+	fs.BoolVar(&opts.revoke, "revoke", false, "revoke and delete the saved token")
+	return func(ctx context.Context, cfg *config, args []string) error {
+		return auth(ctx, cfg, opts, args)
+	}
 }
 
 func (cfg *config) oauthConfig() (*oauth2.Config, error) {
@@ -82,13 +86,16 @@ func (s *savingTokenSource) Token() (*oauth2.Token, error) {
 }
 
 func (cfg *config) newService(ctx context.Context) (*gmail.Service, error) {
+	if cfg.service != nil {
+		return cfg.service, nil
+	}
 	oc, err := cfg.oauthConfig()
 	if err != nil {
 		return nil, err
 	}
 
 	if verbose {
-		fmt.Printf("oauth: credentials:%s token:%s\n", cfg.Credentials, cfg.Token)
+		fmt.Fprintf(cfg.out, "oauth: credentials:%s token:%s\n", cfg.Credentials, cfg.Token)
 	}
 
 	tok, err := readToken(cfg.Token)
@@ -204,51 +211,49 @@ func revokeToken(ctx context.Context, tok *oauth2.Token) error {
 	return nil
 }
 
-func auth(cfg *config, args []string) {
+func auth(ctx context.Context, cfg *config, opts authOptions, args []string) error {
 	if len(args) != 0 {
-		fmt.Fprintf(os.Stderr, "usage: %s %s [-revoke]\n", os.Args[0], os.Args[1])
-		os.Exit(1)
+		return usageError("[-revoke]")
 	}
 
-	ctx := context.Background()
-
-	if authRevoke {
+	if opts.revoke {
 		tok, err := readToken(cfg.Token)
 		if errors.Is(err, os.ErrNotExist) {
-			fatal(fmt.Errorf("no token: %s", cfg.Token))
+			return fmt.Errorf("no token: %s", cfg.Token)
 		} else if err != nil {
-			fatal(err)
+			return err
 		}
 		if err := revokeToken(ctx, tok); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: %s\n", err)
+			warn(cfg, err)
 		}
 		if err := os.Remove(cfg.Token); err != nil {
-			fatal(err)
+			return err
 		}
-		fmt.Printf("deleted %s\n", cfg.Token)
-		return
+		fmt.Fprintf(cfg.out, "deleted %s\n", cfg.Token)
+		return nil
 	}
 
 	oc, err := cfg.oauthConfig()
 	if err != nil {
-		fatal(err)
+		return err
 	}
 	tok, err := authorize(ctx, oc)
 	if err != nil {
-		fatal(err)
+		return err
 	}
 	if err := writeToken(cfg.Token, tok); err != nil {
-		fatal(err)
+		return err
 	}
 
 	svc, err := cfg.newService(ctx)
 	if err != nil {
-		fatal(err)
+		return err
 	}
 	profile, err := svc.Users.GetProfile("me").Context(ctx).Do()
 	if err != nil {
-		fatal(err)
+		return err
 	}
-	fmt.Printf("authorized as %s (%d messages); token saved to %s\n", profile.EmailAddress,
+	fmt.Fprintf(cfg.out, "authorized as %s (%d messages); token saved to %s\n", profile.EmailAddress,
 		profile.MessagesTotal, cfg.Token)
+	return nil
 }

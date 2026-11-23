@@ -26,14 +26,17 @@ func modifyLabels(ctx context.Context, svc *gmail.Service, ids []string, add, re
 	return nil
 }
 
-func archive(cfg *config, args []string) {
-	ctx := context.Background()
-	svc, ids := selectIDs(ctx, cfg, args, "<id>... | <query>...")
-	err := recordChanges(ctx, cfg, svc, ids, nil, func() error {
+func archive(ctx context.Context, cfg *config, args []string) error {
+	svc, ids, err := selectIDs(ctx, cfg, args, "<id>... | <query>...")
+	if err != nil {
+		return err
+	}
+	err = recordChanges(ctx, cfg, svc, ids, nil, func() error {
 		return modifyLabels(ctx, svc, ids, nil, []string{"INBOX"})
 	})
 	if err != nil {
-		fatal(err)
+		return err
 	}
-	fmt.Printf("%d messages archived\n", len(ids))
+	fmt.Fprintf(cfg.out, "%d messages archived\n", len(ids))
+	return nil
 }

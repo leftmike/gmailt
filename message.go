@@ -90,17 +90,17 @@ func truncate(s string, n int) string {
 	return strings.TrimSpace(buf.String())
 }
 
-func (msg *message) printHeaders(fields []string) {
+func (msg *message) printHeaders(w io.Writer, fields []string) {
 	for _, field := range fields {
 		raw := msg.header.Get(field)
 		if decoded, err := wordDecoder.DecodeHeader(raw); err == nil {
 			raw = decoded
 		}
 		if raw != "" {
-			fmt.Printf("%s: %s\n", field, raw)
+			fmt.Fprintf(w, "%s: %s\n", field, raw)
 		}
 	}
-	fmt.Printf("Subject: %s\n", msg.subject)
+	fmt.Fprintf(w, "Subject: %s\n", msg.subject)
 }
 
 func (msg *message) formatBody(summarize bool) string {
@@ -143,7 +143,7 @@ func (msg *message) formatBody(summarize bool) string {
 	return strings.Join(parts, "\n")
 }
 
-func printPartContent(contentType, transferEnc string, body []byte, indent int) {
+func printPartContent(w io.Writer, contentType, transferEnc string, body []byte, indent int) {
 	prefix := strings.Repeat("  ", indent)
 	mediaType, params, err := mime.ParseMediaType(contentType)
 	if err != nil {
@@ -154,9 +154,9 @@ func printPartContent(contentType, transferEnc string, body []byte, indent int) 
 		}
 	}
 	if transferEnc != "" {
-		fmt.Printf("%s%s [%s]\n", prefix, mediaType, strings.ToLower(strings.TrimSpace(transferEnc)))
+		fmt.Fprintf(w, "%s%s [%s]\n", prefix, mediaType, strings.ToLower(strings.TrimSpace(transferEnc)))
 	} else {
-		fmt.Printf("%s%s\n", prefix, mediaType)
+		fmt.Fprintf(w, "%s%s\n", prefix, mediaType)
 	}
 	if strings.HasPrefix(mediaType, "multipart/") {
 		mr := multipart.NewReader(bytes.NewReader(body), params["boundary"])
@@ -167,6 +167,7 @@ func printPartContent(contentType, transferEnc string, body []byte, indent int) 
 			}
 			partBody, _ := io.ReadAll(part)
 			printPartContent(
+				w,
 				part.Header.Get("Content-Type"),
 				part.Header.Get("Content-Transfer-Encoding"),
 				partBody,
@@ -176,8 +177,9 @@ func printPartContent(contentType, transferEnc string, body []byte, indent int) 
 	}
 }
 
-func (msg *message) printContent() {
+func (msg *message) printContent(w io.Writer) {
 	printPartContent(
+		w,
 		msg.header.Get("Content-Type"),
 		msg.header.Get("Content-Transfer-Encoding"),
 		msg.body,

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -115,7 +116,7 @@ func TestRevertChange(t *testing.T) {
 
 	c := labelChange{IDs: []string{"a", "b"}, Added: []string{"TRASH", "STARRED"},
 		Removed: []string{"INBOX"}}
-	if err := revertChange(context.Background(), svc, c); err != nil {
+	if err := revertChange(context.Background(), io.Discard, svc, c); err != nil {
 		t.Fatal(err)
 	}
 	slices.Sort(untrashed)
@@ -154,11 +155,7 @@ func TestRecordChanges(t *testing.T) {
 		}
 	})
 
-	saved := os.Args
-	os.Args = []string{"gmailt", "archive", "in:inbox"}
-	t.Cleanup(func() { os.Args = saved })
-
-	cfg := &config{History: filepath.Join(t.TempDir(), "history.jsonl")}
+	cfg := &config{History: filepath.Join(t.TempDir(), "history.jsonl"), command: "archive in:inbox"}
 	ctx := context.Background()
 	ids := []string{"a", "b", "c"}
 	err := recordChanges(ctx, cfg, svc, ids, []string{"New"}, func() error {

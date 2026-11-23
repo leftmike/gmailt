@@ -3,8 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
-	"os"
 	"strings"
 
 	"google.golang.org/api/gmail/v1"
@@ -35,26 +33,25 @@ func parseIDArgs(args []string) ([]string, string, error) {
 }
 
 func selectIDs(ctx context.Context, cfg *config, args []string,
-	usage string) (*gmail.Service, []string) {
+	usage string) (*gmail.Service, []string, error) {
 
 	if len(args) == 0 {
-		fmt.Fprintf(os.Stderr, "usage: %s %s %s\n", os.Args[0], os.Args[1], usage)
-		os.Exit(1)
+		return nil, nil, usageError(usage)
 	}
 	ids, query, err := parseIDArgs(args)
 	if err != nil {
-		fatal(err)
+		return nil, nil, err
 	}
 
 	svc, err := cfg.newService(ctx)
 	if err != nil {
-		fatal(err)
+		return nil, nil, err
 	}
 	if query != "" {
 		ids, _, err = listIDs(ctx, svc, query, 0)
 		if err != nil {
-			fatal(err)
+			return nil, nil, err
 		}
 	}
-	return svc, ids
+	return svc, ids, nil
 }

@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"context"
 	"fmt"
-	"os"
 	"slices"
 	"strings"
 
@@ -72,21 +71,19 @@ func sortLabels(all []*gmail.Label) {
 	})
 }
 
-func labels(cfg *config, args []string) {
+func labels(ctx context.Context, cfg *config, args []string) error {
 	if len(args) != 0 {
-		fmt.Fprintf(os.Stderr, "usage: %s %s\n", os.Args[0], os.Args[1])
-		os.Exit(1)
+		return usageError("")
 	}
 
-	ctx := context.Background()
 	svc, err := cfg.newService(ctx)
 	if err != nil {
-		fatal(err)
+		return err
 	}
 
 	all, err := listLabels(ctx, svc)
 	if err != nil {
-		fatal(err)
+		return err
 	}
 	sortLabels(all)
 	var ids []string
@@ -94,18 +91,15 @@ func labels(cfg *config, args []string) {
 		ids = append(ids, l.Id)
 	}
 
-	fmt.Printf("%8s %8s  %s\n", "messages", "unread", "label")
-	err = each(ctx, ids,
+	fmt.Fprintf(cfg.out, "%8s %8s  %s\n", "messages", "unread", "label")
+	return each(ctx, cfg.out, ids,
 		func(ctx context.Context, id string) (*gmail.Label, error) {
 			return retry(ctx, func() (*gmail.Label, error) {
 				return svc.Users.Labels.Get("me", id).Context(ctx).Do()
 			})
 		},
 		func(id string, l *gmail.Label) error {
-			fmt.Printf("%8d %8d  %s\n", l.MessagesTotal, l.MessagesUnread, l.Name)
+			fmt.Fprintf(cfg.out, "%8d %8d  %s\n", l.MessagesTotal, l.MessagesUnread, l.Name)
 			return nil
 		})
-	if err != nil {
-		fatal(err)
-	}
 }

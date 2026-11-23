@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -172,11 +171,9 @@ func TestEach(t *testing.T) {
 	}
 
 	var skipped strings.Builder
-	skipOutput = &skipped
-	t.Cleanup(func() { skipOutput = os.Stdout })
 
 	var got []string
-	err := each(context.Background(), ids,
+	err := each(context.Background(), &skipped, ids,
 		func(ctx context.Context, id string) (string, error) {
 			if bad[id] {
 				return "", errors.New("fail")
@@ -201,7 +198,7 @@ func TestEach(t *testing.T) {
 
 	stop := errors.New("stop")
 	n := 0
-	err = each(context.Background(), ids,
+	err = each(context.Background(), io.Discard, ids,
 		func(ctx context.Context, id string) (string, error) { return id, nil },
 		func(id string, v string) error {
 			n++

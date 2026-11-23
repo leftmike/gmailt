@@ -2,21 +2,28 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
-	"os"
+	"io"
 	"slices"
 	"strings"
 
 	"google.golang.org/api/gmail/v1"
 )
 
-var (
-	format = "normal"
-)
+const getUsage = "[-format <format>] <id>... | <query>..."
 
-func getFlags(fs *flag.FlagSet) {
-	fs.StringVar(&format, "format", "normal", "brief|normal|full|raw|parts|labels")
+type getOptions struct {
+	format string
+}
+
+func getCmd(fs *flag.FlagSet) runFunc {
+	var opts getOptions
+	fs.StringVar(&opts.format, "format", "normal", "brief|normal|full|raw|parts|labels")
+	return func(ctx context.Context, cfg *config, args []string) error {
+		return get(ctx, cfg, opts, args)
+	}
 }
 
 func formatLabels(ids []string, names map[string]string) string {
@@ -32,10 +39,10 @@ func formatLabels(ids []string, names map[string]string) string {
 	return strings.Join(labels, ", ")
 }
 
-func printMessage(raw []byte) error {
+func printMessage(w io.Writer, format string, raw []byte) error {
 	if format == "raw" {
-		os.Stdout.Write(raw)
-		return nil
+		_, err := w.Write(raw)
+		return err
 	}
 
 	entity, err := parseMessage(raw)
@@ -49,18 +56,18 @@ func printMessage(raw []byte) error {
 
 	switch format {
 	case "brief":
-		msg.printHeaders([]string{"Date", "From"})
-		fmt.Println()
-		fmt.Println(msg.formatBody(true))
+		msg.printHeaders(w, []string{"Date", "From"})
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, msg.formatBody(true))
 
 	case "normal":
-		msg.printHeaders([]string{"Date", "From", "To", "CC", "BCC"})
-		fmt.Printf("Content-Type: %s\n", msg.header.Get("Content-Type"))
+		msg.printHeaders(w, []string{"Date", "From", "To", "CC", "BCC"})
+		fmt.Fprintf(w, "Content-Type: %s\n", msg.header.Get("Content-Type"))
 		if cte := msg.header.Get("Content-Transfer-Encoding"); cte != "" {
-			fmt.Printf("Content-Transfer-Encoding: %s\n", cte)
+			fmt.Fprintf(w, "Content-Transfer-Encoding: %s\n", cte)
 		}
-		fmt.Println()
-		fmt.Println(msg.formatBody(false))
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, msg.formatBody(false))
 
 	case "full":
 		fields := msg.header.Fields()
@@ -69,68 +76,61 @@ func printMessage(raw []byte) error {
 			if err != nil {
 				text = fields.Value()
 			}
-			fmt.Printf("%s: %s\n", fields.Key(), text)
+			fmt.Fprintf(w, "%s: %s\n", fields.Key(), text)
 		}
-		fmt.Println()
-		fmt.Println(msg.formatBody(false))
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, msg.formatBody(false))
 
 	case "parts":
-		msg.printContent()
+		msg.printContent(w)
 	}
 	return nil
 }
 
-func get(cfg *config, args []string) {
-	if !slices.Contains([]string{"brief", "normal", "full", "raw", "parts", "labels"}, format) {
-		fmt.Fprintf(os.Stderr,
-			"usage: %s %s: expected brief, normal, full, raw, parts, or labels for format\n",
-			os.Args[0], os.Args[1])
-		os.Exit(1)
+func get(ctx context.Context, cfg *config, opts getOptions, args []string) error {
+	if !slices.Contains([]string{"brief", "normal", "full", "raw", "parts", "labels"}, opts.format) {
+		return errors.New("expected brief, normal, full, raw, parts, or labels for -format")
 	}
 
-	ctx := context.Background()
-	svc, ids := selectIDs(ctx, cfg, args, "[-format <format>] <id>... | <query>...")
+	svc, ids, err := selectIDs(ctx, cfg, args, getUsage)
+	if err != nil {
+		return err
+	}
 
 	separator := func(id string) {
 		if len(ids) > 1 {
-			fmt.Printf("--------------------------------[%s]--------------------------------\n", id)
+			fmt.Fprintf(cfg.out, "--------------------------------[%s]--------------------------------\n",
+				id)
 		}
 	}
 
-	if format == "labels" {
+	if opts.format == "labels" {
 		names, err := labelNames(ctx, svc)
 		if err != nil {
-			fatal(err)
+			return err
 		}
-		err = each(ctx, ids,
+		return each(ctx, cfg.out, ids,
 			func(ctx context.Context, id string) (*gmail.Message, error) {
 				return getMetadata(ctx, svc, id)
 			},
 			func(id string, m *gmail.Message) error {
 				separator(id)
-				fmt.Printf("Date: %s\nFrom: %s\nSubject: %s\nLabels: %s\n", header(m, "Date"),
+				fmt.Fprintf(cfg.out, "Date: %s\nFrom: %s\nSubject: %s\nLabels: %s\n", header(m, "Date"),
 					decodeHeader(header(m, "From")), decodeHeader(header(m, "Subject")),
 					formatLabels(m.LabelIds, names))
 				return nil
 			})
-		if err != nil {
-			fatal(err)
-		}
-		return
 	}
 
-	err := each(ctx, ids,
+	return each(ctx, cfg.out, ids,
 		func(ctx context.Context, id string) ([]byte, error) {
 			return getRaw(ctx, svc, id)
 		},
 		func(id string, raw []byte) error {
 			separator(id)
-			if err := printMessage(raw); err != nil {
-				fmt.Printf("skipping: %s: %s\n", id, err)
+			if err := printMessage(cfg.out, opts.format, raw); err != nil {
+				fmt.Fprintf(cfg.out, "skipping: %s: %s\n", id, err)
 			}
 			return nil
 		})
-	if err != nil {
-		fatal(err)
-	}
 }

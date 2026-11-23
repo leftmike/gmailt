@@ -1,20 +1,29 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 
 	"github.com/hashicorp/hcl/v2/hclsimple"
+	"google.golang.org/api/gmail/v1"
 )
 
 type config struct {
 	Credentials string `hcl:"credentials,optional"`
 	Token       string `hcl:"token,optional"`
 	History     string `hcl:"history,optional"`
+
+	service *gmail.Service
+	out     io.Writer
+	errOut  io.Writer
+	name    string
+	command string
 }
 
 func configDir() string {
@@ -61,7 +70,7 @@ func readConfig(filenames []string) (*config, error) {
 	return nil, nil
 }
 
-func loadConfig(fs *flag.FlagSet, args []string) (*config, []string) {
+func loadConfig(fs *flag.FlagSet, args []string) (*config, []string, error) {
 	var configFile string
 
 	fs.BoolVar(&verbose, "verbose", false, "enable verbose output")
@@ -77,14 +86,14 @@ func loadConfig(fs *flag.FlagSet, args []string) (*config, []string) {
 	if configFile != "" {
 		cfg, err = readConfig([]string{configFile})
 		if err != nil {
-			fatal(err)
+			return nil, nil, err
 		} else if cfg == nil {
-			fatal(fmt.Errorf("config file not found: %s", configFile))
+			return nil, nil, fmt.Errorf("config file not found: %s", configFile)
 		}
 	} else {
 		cfg, err = readConfig(configFilenames())
 		if err != nil {
-			fatal(err)
+			return nil, nil, err
 		} else if cfg == nil {
 			cfg = &config{}
 		}
@@ -113,11 +122,19 @@ func loadConfig(fs *flag.FlagSet, args []string) (*config, []string) {
 	cfg.Token = expandHome(cfg.Token)
 	cfg.History = expandHome(cfg.History)
 
-	return cfg, fs.Args()
+	return cfg, fs.Args(), nil
 }
 
-func showConfig(cfg *config, args []string) {
-	fmt.Printf("credentials: %s\n", cfg.Credentials)
-	fmt.Printf("token:       %s\n", cfg.Token)
-	fmt.Printf("history:     %s\n", cfg.History)
+func showConfig(ctx context.Context, cfg *config, args []string) error {
+	if len(args) != 0 {
+		return usageError("")
+	}
+	fmt.Fprintf(cfg.out, "credentials: %s\n", cfg.Credentials)
+	fmt.Fprintf(cfg.out, "token:       %s\n", cfg.Token)
+	fmt.Fprintf(cfg.out, "history:     %s\n", cfg.History)
+	return nil
+}
+
+func warn(cfg *config, err error) {
+	fmt.Fprintf(cfg.errOut, "%s: warning: %s\n", cfg.name, err)
 }
