@@ -9,6 +9,7 @@ import (
 	"io"
 	"math/rand/v2"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -64,7 +65,7 @@ func retry[T any](ctx context.Context, call func() (T, error)) (T, error) {
 			return v, err
 		}
 		if verbose {
-			fmt.Printf("retrying in %s: %s\n", delay, err)
+			fmt.Fprintf(os.Stderr, "retrying in %s: %s\n", delay, err)
 		}
 		select {
 		case <-ctx.Done():

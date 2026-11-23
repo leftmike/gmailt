@@ -1,8 +1,11 @@
 package main
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"golang.org/x/oauth2"
@@ -66,5 +69,27 @@ func TestSavingTokenSource(t *testing.T) {
 	}
 	if got.AccessToken != "two" || s.last != "two" {
 		t.Errorf("refreshed token: got %q, last %q", got.AccessToken, s.last)
+	}
+}
+
+func TestLogTransport(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	t.Cleanup(srv.Close)
+
+	var buf strings.Builder
+	client := &http.Client{Transport: &logTransport{base: http.DefaultTransport, w: &buf}}
+	resp, err := client.Get(srv.URL +
+		"/gmail/v1/users/me/messages?alt=json&prettyPrint=false&q=in%3Ainbox+is%3Aunread")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+
+	got := buf.String()
+	want := "GET /gmail/v1/users/me/messages?q=in:inbox is:unread: 404 Not Found ("
+	if !strings.HasPrefix(got, want) || !strings.HasSuffix(got, "ms)\n") {
+		t.Errorf("logTransport: got %q, want prefix %q", got, want)
 	}
 }

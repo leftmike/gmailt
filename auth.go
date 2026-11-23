@@ -95,7 +95,7 @@ func (cfg *config) newService(ctx context.Context) (*gmail.Service, error) {
 	}
 
 	if verbose {
-		fmt.Fprintf(cfg.out, "oauth: credentials:%s token:%s\n", cfg.Credentials, cfg.Token)
+		fmt.Fprintf(cfg.errOut, "oauth: credentials:%s token:%s\n", cfg.Credentials, cfg.Token)
 	}
 
 	tok, err := readToken(cfg.Token)
@@ -121,7 +121,38 @@ func (cfg *config) newService(ctx context.Context) (*gmail.Service, error) {
 		return nil, err
 	}
 
-	return gmail.NewService(ctx, option.WithTokenSource(ts))
+	client := oauth2.NewClient(ctx, ts)
+	if verbose {
+		client.Transport = &logTransport{base: client.Transport, w: cfg.errOut}
+	}
+	return gmail.NewService(ctx, option.WithHTTPClient(client))
+}
+
+type logTransport struct {
+	base http.RoundTripper
+	w    io.Writer
+}
+
+func (lt *logTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	q := req.URL.Query()
+	q.Del("alt")
+	q.Del("prettyPrint")
+	target := req.URL.Path
+	if len(q) > 0 {
+		if s, err := url.QueryUnescape(q.Encode()); err == nil {
+			target += "?" + s
+		}
+	}
+
+	start := time.Now()
+	resp, err := lt.base.RoundTrip(req)
+	elapsed := time.Since(start).Round(time.Millisecond)
+	if err != nil {
+		fmt.Fprintf(lt.w, "%s %s: %s (%s)\n", req.Method, target, err, elapsed)
+	} else {
+		fmt.Fprintf(lt.w, "%s %s: %s (%s)\n", req.Method, target, resp.Status, elapsed)
+	}
+	return resp, err
 }
 
 func authorize(ctx context.Context, oc *oauth2.Config) (*oauth2.Token, error) {
