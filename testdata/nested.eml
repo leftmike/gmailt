@@ -1,0 +1,23 @@
+From: a@example.com
+Subject: nested
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="M"
+
+--M
+Content-Type: multipart/alternative; boundary="A"
+
+--A
+Content-Type: text/plain; charset=utf-8
+
+See the attached report.
+--A
+Content-Type: text/html; charset=utf-8
+
+<p>See the attached report.</p>
+--A--
+--M
+Content-Type: application/pdf
+Content-Transfer-Encoding: base64
+
+JVBERg==
+--M--

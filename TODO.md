@@ -22,3 +22,10 @@
 
 - Move shared code (body extraction from `message.go`, `wrapForward`) into a common package
   imported by both tools.
+
+## `-n` for `delete`, `archive`, and `label`
+
+- Add `-n <max>` to cap how many messages a query may match; if more match, fail without
+  changing anything. Pick a sensible default and allow `-n 0` for no limit, as with `list`.
+- Ids given directly aren't limited.
+- Tests and README.

@@ -39,6 +39,8 @@ func TestFormatBody(t *testing.T) {
 			"Café crème brûlée.\n[text/html; charset=utf-8, base64, 12 bytes]"},
 		{"html-only.eml", "html only",
 			"[text/html; charset=shift_jis, base64, 16 bytes]\n[application/pdf, base64, 5 bytes]"},
+		{"nested.eml", "nested",
+			"See the attached report.\n[text/html; charset=utf-8, 31 bytes]\n[application/pdf, base64, 4 bytes]"},
 		{"unknown-encoding.eml", "unknown encoding", "hello there\r\n"},
 	}
 	for _, c := range cases {

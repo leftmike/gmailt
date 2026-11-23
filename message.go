@@ -41,10 +41,12 @@ func (msg *message) eachPart(fn func(mediaType string, part *msgformat.Entity)) 
 	if err != nil {
 		return
 	}
-	mr := entity.MultipartReader()
-	if mr == nil {
-		return
+	if mr := entity.MultipartReader(); mr != nil {
+		walkParts(mr, fn)
 	}
+}
+
+func walkParts(mr msgformat.MultipartReader, fn func(mediaType string, part *msgformat.Entity)) {
 	for {
 		part, _ := mr.NextPart()
 		if part == nil {
@@ -53,6 +55,10 @@ func (msg *message) eachPart(fn func(mediaType string, part *msgformat.Entity)) 
 		mediaType, _, _ := part.Header.ContentType()
 		if mediaType == "" {
 			mediaType = "text/plain"
+		}
+		if nested := part.MultipartReader(); nested != nil {
+			walkParts(nested, fn)
+			continue
 		}
 		fn(mediaType, part)
 	}
