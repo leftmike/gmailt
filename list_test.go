@@ -65,3 +65,12 @@ func TestFormatListLine(t *testing.T) {
 		t.Errorf("formatListLine read: got %q", got)
 	}
 }
+
+func TestListQuery(t *testing.T) {
+	if got := listQuery(nil); got != "in:inbox" {
+		t.Errorf("listQuery default: got %q", got)
+	}
+	if got := listQuery([]string{"-in:inbox", "from:alice"}); got != "-in:inbox from:alice" {
+		t.Errorf("listQuery: got %q", got)
+	}
+}

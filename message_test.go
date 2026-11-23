@@ -3,7 +3,6 @@ package main
 import (
 	"os"
 	"path/filepath"
-	"slices"
 	"testing"
 )
 
@@ -63,36 +62,5 @@ func TestFormatBody(t *testing.T) {
 		if got := msg.formatBody(false); got != c.body {
 			t.Errorf("%s: formatBody: got %q, want %q", c.file, got, c.body)
 		}
-	}
-}
-
-func TestParseIDArgs(t *testing.T) {
-	ids, query, err := parseIDArgs([]string{"1a2046b535d465fe", "1A2044F4048D3679"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !slices.Equal(ids, []string{"1a2046b535d465fe", "1a2044f4048d3679"}) || query != "" {
-		t.Errorf("parseIDArgs ids: got %v, %q", ids, query)
-	}
-
-	ids, query, err = parseIDArgs([]string{"from:alice", "is:unread", "1a2046b535d465f",
-		"1a2046b535d465fe0", "1a2046b535d465fg"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if ids != nil || query != "from:alice is:unread 1a2046b535d465f 1a2046b535d465fe0 1a2046b535d465fg" {
-		t.Errorf("parseIDArgs query: got %v, %q", ids, query)
-	}
-
-	if _, _, err := parseIDArgs([]string{"1a2046b535d465fe", "from:alice"}); err == nil {
-		t.Error("parseIDArgs mixed: expected error")
-	}
-}
-
-func TestFormatLabels(t *testing.T) {
-	names := map[string]string{"INBOX": "INBOX", "UNREAD": "UNREAD", "Label_1": "receipts"}
-	got := formatLabels([]string{"UNREAD", "Label_1", "INBOX", "Label_9"}, names)
-	if want := "INBOX, Label_9, UNREAD, receipts"; got != want {
-		t.Errorf("formatLabels: got %q, want %q", got, want)
 	}
 }

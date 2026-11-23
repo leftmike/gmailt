@@ -8,12 +8,15 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"slices"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"google.golang.org/api/gmail/v1"
+	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
 )
 
@@ -168,6 +171,10 @@ func TestEach(t *testing.T) {
 		}
 	}
 
+	var skipped strings.Builder
+	skipOutput = &skipped
+	t.Cleanup(func() { skipOutput = os.Stdout })
+
 	var got []string
 	err := each(context.Background(), ids,
 		func(ctx context.Context, id string) (string, error) {
@@ -186,6 +193,11 @@ func TestEach(t *testing.T) {
 	if !slices.Equal(got, want) {
 		t.Errorf("each: got %d results, want %d in order", len(got), len(want))
 	}
+	wantSkipped := "skipping: m7: fail\nskipping: m57: fail\nskipping: m107: fail\nskipping: m157: fail\n" +
+		"skipping: m207: fail\n"
+	if skipped.String() != wantSkipped {
+		t.Errorf("each: skipped %q, want %q", skipped.String(), wantSkipped)
+	}
 
 	stop := errors.New("stop")
 	n := 0
@@ -200,5 +212,26 @@ func TestEach(t *testing.T) {
 		})
 	if !errors.Is(err, stop) || n != 3 {
 		t.Errorf("each stop: got err %v after %d", err, n)
+	}
+}
+
+func TestRetryable(t *testing.T) {
+	cases := []struct {
+		err  error
+		want bool
+	}{
+		{&googleapi.Error{Code: 429}, true},
+		{&googleapi.Error{Code: 503}, true},
+		{fmt.Errorf("wrapped: %w", &googleapi.Error{Code: 500}), true},
+		{&googleapi.Error{Code: 403, Errors: []googleapi.ErrorItem{{Reason: "userRateLimitExceeded"}}}, true},
+		{&googleapi.Error{Code: 403, Errors: []googleapi.ErrorItem{{Reason: "insufficientPermissions"}}}, false},
+		{&googleapi.Error{Code: 404}, false},
+		{&googleapi.Error{Code: 400}, false},
+		{errors.New("network"), false},
+	}
+	for _, c := range cases {
+		if got := retryable(c.err); got != c.want {
+			t.Errorf("retryable(%v): got %v, want %v", c.err, got, c.want)
+		}
 	}
 }

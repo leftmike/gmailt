@@ -132,3 +132,66 @@ func TestCommandLine(t *testing.T) {
 		t.Errorf("commandLine: got %q, want %q", got, want)
 	}
 }
+
+func TestRecordChanges(t *testing.T) {
+	var starts []string
+	svc := newTestService(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/gmail/v1/users/me/profile":
+			w.Write([]byte(`{"historyId":"100"}`))
+		case "/gmail/v1/users/me/history":
+			q := r.URL.Query()
+			starts = append(starts, q.Get("startHistoryId"))
+			if q.Get("pageToken") == "" {
+				w.Write([]byte(`{"history":[{"labelsRemoved":[{"message":{"id":"a"},"labelIds":["INBOX"]}]}],
+					"nextPageToken":"p2"}`))
+			} else {
+				w.Write([]byte(`{"history":[{"labelsRemoved":[{"message":{"id":"b"},"labelIds":["INBOX"]}]}]}`))
+			}
+		case "/gmail/v1/users/me/messages/batchModify":
+		default:
+			http.NotFound(w, r)
+		}
+	})
+
+	saved := os.Args
+	os.Args = []string{"gmailt", "archive", "in:inbox"}
+	t.Cleanup(func() { os.Args = saved })
+
+	cfg := &config{History: filepath.Join(t.TempDir(), "history.jsonl")}
+	ctx := context.Background()
+	ids := []string{"a", "b", "c"}
+	err := recordChanges(ctx, cfg, svc, ids, []string{"New"}, func() error {
+		return modifyLabels(ctx, svc, ids, nil, []string{"INBOX"})
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	entries, _, err := readHistory(cfg.History)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []labelChange{{IDs: []string{"a", "b"}, Removed: []string{"INBOX"}}}
+	if len(entries) != 1 || entries[0].Command != "archive in:inbox" ||
+		!reflect.DeepEqual(entries[0].Changes, want) || !slices.Equal(entries[0].Created, []string{"New"}) ||
+		!slices.Equal(starts, []string{"100", "100"}) {
+		t.Errorf("recordChanges: got %+v, starts %v", entries, starts)
+	}
+}
+
+func TestFormatHistoryLine(t *testing.T) {
+	e := historyEntry{
+		N:       7,
+		Time:    time.Date(2026, 11, 22, 10, 15, 0, 0, time.Local),
+		Command: "label +spam ^inbox from:x",
+		Changes: []labelChange{
+			{IDs: []string{"a", "b"}, Added: []string{"SPAM"}, Removed: []string{"INBOX"}},
+			{IDs: []string{"b", "c"}, Added: []string{"SPAM"}},
+		},
+	}
+	want := "   7  2026-11-22 10:15       3  label +spam ^inbox from:x  (undone)"
+	if got := formatHistoryLine(e, true); got != want {
+		t.Errorf("formatHistoryLine: got %q, want %q", got, want)
+	}
+}

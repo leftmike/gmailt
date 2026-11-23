@@ -6,8 +6,10 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"math/rand/v2"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -27,9 +29,10 @@ const (
 )
 
 var (
-	retryDelay      = time.Second
-	limiter         = rate.NewLimiter(40, 10)
-	metadataHeaders = []string{"From", "Subject", "Date"}
+	retryDelay                = time.Second
+	limiter                   = rate.NewLimiter(40, 10)
+	metadataHeaders           = []string{"From", "Subject", "Date"}
+	skipOutput      io.Writer = os.Stdout
 )
 
 func retryable(err error) bool {
@@ -169,7 +172,7 @@ func each[T any](ctx context.Context, ids []string, fetch func(ctx context.Conte
 
 		for i, id := range chunk {
 			if errs[i] != nil {
-				fmt.Printf("skipping: %s: %s\n", id, errs[i])
+				fmt.Fprintf(skipOutput, "skipping: %s: %s\n", id, errs[i])
 				continue
 			}
 			if err := fn(id, vals[i]); err != nil {

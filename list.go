@@ -65,14 +65,18 @@ func formatListLine(m *gmail.Message) string {
 		decodeHeader(header(m, "Subject")))
 }
 
+func listQuery(args []string) string {
+	if len(args) == 0 {
+		return "in:inbox"
+	}
+	return strings.Join(args, " ")
+}
+
 func list(cfg *config, args []string) {
 	if listMax < 0 {
 		fatal(errors.New("-n must be 0 or more"))
 	}
-	q := strings.Join(args, " ")
-	if q == "" {
-		q = "in:inbox"
-	}
+	q := listQuery(args)
 
 	ctx := context.Background()
 	svc, err := cfg.newService(ctx)
