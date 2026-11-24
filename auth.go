@@ -199,7 +199,11 @@ func authorize(ctx context.Context, oc *oauth2.Config, w io.Writer) (*oauth2.Tok
 		}
 	})}
 	go srv.Serve(ln)
-	defer srv.Close()
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		srv.Shutdown(ctx)
+	}()
 
 	authURL := oc.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.ApprovalForce,
 		oauth2.S256ChallengeOption(verifier))
