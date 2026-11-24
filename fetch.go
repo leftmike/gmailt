@@ -29,9 +29,10 @@ const (
 )
 
 var (
-	retryDelay      = time.Second
-	limiter         = rate.NewLimiter(40, 10)
-	metadataHeaders = []string{"From", "Subject", "Date"}
+	logOut          io.Writer = os.Stderr
+	retryDelay                = time.Second
+	limiter                   = rate.NewLimiter(40, 10)
+	metadataHeaders           = []string{"From", "Subject", "Date"}
 )
 
 func retryable(err error) bool {
@@ -65,7 +66,7 @@ func retry[T any](ctx context.Context, call func() (T, error)) (T, error) {
 			return v, err
 		}
 		if verbose {
-			fmt.Fprintf(os.Stderr, "retrying in %s: %s\n", delay, err)
+			fmt.Fprintf(logOut, "retrying in %s: %s\n", delay, err)
 		}
 		select {
 		case <-ctx.Done():

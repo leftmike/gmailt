@@ -35,6 +35,7 @@ type fakeGmail struct {
 	labels    []*gmail.Label
 	historyID uint64
 	history   []*gmail.History
+	failNext  int
 	svc       *gmail.Service
 }
 
@@ -74,6 +75,11 @@ func newFakeGmail(t *testing.T) *fakeGmail {
 	f.svc = newTestService(t, func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		defer f.mu.Unlock()
+		if f.failNext > 0 {
+			f.failNext--
+			http.Error(w, `{"error":{"code":503,"message":"unavailable"}}`, http.StatusServiceUnavailable)
+			return
+		}
 		mux.ServeHTTP(w, r)
 	})
 	return f
@@ -308,6 +314,7 @@ func (tr *testRun) run(args ...string) (string, string, error) {
 		out:     &out,
 		errOut:  &errOut,
 		name:    "gmailt " + args[0],
+		program: "gmailt",
 		command: commandLine(args),
 	}
 	err := run(tr.t.Context(), cfg, fs.Args())
@@ -526,6 +533,21 @@ func TestUndoMissingMessage(t *testing.T) {
 	}
 	if got := tr.ok("history"); !strings.HasSuffix(got, "(undone)\n") {
 		t.Errorf("history after undo: got %q", got)
+	}
+}
+
+func TestVerboseRetry(t *testing.T) {
+	tr := newTestRun(t)
+	verbose, retryDelay = true, time.Millisecond
+	t.Cleanup(func() { verbose, retryDelay = false, time.Second })
+
+	tr.f.failNext = 1
+	out, errOut, err := tr.run("labels")
+	if err != nil || !strings.Contains(out, "Receipts") {
+		t.Fatalf("labels: %v, stdout %q", err, out)
+	}
+	if !strings.HasPrefix(errOut, "retrying in ") || !strings.Contains(errOut, "503") {
+		t.Errorf("labels stderr: got %q", errOut)
 	}
 }
 

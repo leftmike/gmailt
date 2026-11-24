@@ -83,6 +83,7 @@ func main() {
 			cfg.out = os.Stdout
 			cfg.errOut = os.Stderr
 			cfg.name = name
+			cfg.program = os.Args[0]
 			cfg.command = commandLine(os.Args[1:])
 
 			if err := run(context.Background(), cfg, args); err != nil {

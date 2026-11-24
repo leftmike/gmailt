@@ -23,6 +23,7 @@ type config struct {
 	out     io.Writer
 	errOut  io.Writer
 	name    string
+	program string
 	command string
 }
 

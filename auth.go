@@ -86,6 +86,7 @@ func (s *savingTokenSource) Token() (*oauth2.Token, error) {
 }
 
 func (cfg *config) newService(ctx context.Context) (*gmail.Service, error) {
+	logOut = cfg.errOut
 	if cfg.service != nil {
 		return cfg.service, nil
 	}
@@ -100,7 +101,7 @@ func (cfg *config) newService(ctx context.Context) (*gmail.Service, error) {
 
 	tok, err := readToken(cfg.Token)
 	if errors.Is(err, os.ErrNotExist) {
-		tok, err = authorize(ctx, oc)
+		tok, err = authorize(ctx, oc, cfg.errOut)
 		if err != nil {
 			return nil, err
 		}
@@ -116,7 +117,7 @@ func (cfg *config) newService(ctx context.Context) (*gmail.Service, error) {
 	if _, err := ts.Token(); err != nil {
 		var re *oauth2.RetrieveError
 		if errors.As(err, &re) && re.ErrorCode == "invalid_grant" {
-			return nil, fmt.Errorf("token expired or revoked; run %s auth", os.Args[0])
+			return nil, fmt.Errorf("token expired or revoked; run %s auth", cfg.program)
 		}
 		return nil, err
 	}
@@ -155,7 +156,7 @@ func (lt *logTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return resp, err
 }
 
-func authorize(ctx context.Context, oc *oauth2.Config) (*oauth2.Token, error) {
+func authorize(ctx context.Context, oc *oauth2.Config, w io.Writer) (*oauth2.Token, error) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, err
@@ -202,7 +203,7 @@ func authorize(ctx context.Context, oc *oauth2.Config) (*oauth2.Token, error) {
 
 	authURL := oc.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.ApprovalForce,
 		oauth2.S256ChallengeOption(verifier))
-	fmt.Fprintf(os.Stderr, "open this URL in a browser to authorize gmailt:\n\n%s\n\n", authURL)
+	fmt.Fprintf(w, "open this URL in a browser to authorize gmailt:\n\n%s\n\n", authURL)
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
@@ -268,7 +269,7 @@ func auth(ctx context.Context, cfg *config, opts authOptions, args []string) err
 	if err != nil {
 		return err
 	}
-	tok, err := authorize(ctx, oc)
+	tok, err := authorize(ctx, oc, cfg.errOut)
 	if err != nil {
 		return err
 	}

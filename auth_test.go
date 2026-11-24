@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bufio"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -91,5 +94,44 @@ func TestLogTransport(t *testing.T) {
 	want := "GET /gmail/v1/users/me/messages?q=in:inbox is:unread: 404 Not Found ("
 	if !strings.HasPrefix(got, want) || !strings.HasSuffix(got, "ms)\n") {
 		t.Errorf("logTransport: got %q, want prefix %q", got, want)
+	}
+}
+
+func TestAuthorizeOutput(t *testing.T) {
+	oc := &oauth2.Config{ClientID: "id", Endpoint: oauth2.Endpoint{AuthURL: "https://auth.example.com/"}}
+	pr, pw := io.Pipe()
+	done := make(chan error, 1)
+	go func() {
+		_, err := authorize(t.Context(), oc, pw)
+		done <- err
+	}()
+
+	r := bufio.NewReader(pr)
+	var lines []string
+	for range 3 {
+		line, err := r.ReadString('\n')
+		if err != nil {
+			t.Fatal(err)
+		}
+		lines = append(lines, strings.TrimSuffix(line, "\n"))
+	}
+	go io.Copy(io.Discard, r)
+	if lines[0] != "open this URL in a browser to authorize gmailt:" || lines[1] != "" {
+		t.Fatalf("authorize: got %q", lines)
+	}
+
+	u, err := url.Parse(lines[2])
+	if err != nil {
+		t.Fatal(err)
+	}
+	q := u.Query()
+	resp, err := http.Get(q.Get("redirect_uri") + "?state=" + url.QueryEscape(q.Get("state")) +
+		"&error=access_denied")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if err := <-done; err == nil || err.Error() != "authorization failed: access_denied" {
+		t.Errorf("authorize: got %v", err)
 	}
 }
