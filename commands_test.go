@@ -453,7 +453,7 @@ func TestLabelUndo(t *testing.T) {
 	tr := newTestRun(t)
 
 	got := tr.ok("label", "+starred", "^unread", "in:inbox")
-	if got != "2 messages updated: +STARRED ^UNREAD\n" {
+	if got != "1 messages updated: +STARRED ^UNREAD\n" {
 		t.Errorf("label: got %q", got)
 	}
 	if got := tr.ok("history"); !strings.Contains(got, "     1  label +starred ^unread in:inbox\n") {
@@ -575,6 +575,22 @@ func TestUndoDamagedHistory(t *testing.T) {
 	}
 	if got := tr.ok("history"); !strings.HasSuffix(got, "archive in:inbox  (undone)\n") {
 		t.Errorf("history after undo: got %q", got)
+	}
+}
+
+func TestChangedCounts(t *testing.T) {
+	tr := newTestRun(t)
+
+	if got := tr.ok("label", "+starred", "000000000000000c", "0000000000000fff"); got !=
+		"1 messages updated: +STARRED\n" {
+		t.Errorf("label: got %q", got)
+	}
+	if got := tr.ok("label", "+starred", "000000000000000c"); got != "0 messages updated: +STARRED\n" {
+		t.Errorf("label again: got %q", got)
+	}
+	if got := tr.ok("archive", "000000000000000a", "000000000000000b", "0000000000000fff"); got !=
+		"1 messages archived\n" {
+		t.Errorf("archive: got %q", got)
 	}
 }
 

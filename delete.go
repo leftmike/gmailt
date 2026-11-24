@@ -20,7 +20,7 @@ func trash(ctx context.Context, cfg *config, args []string) error {
 	}
 
 	cnt := 0
-	err = recordChanges(ctx, cfg, svc, ids, nil, func() error {
+	_, err = recordChanges(ctx, cfg, svc, ids, nil, func() error {
 		return each(ctx, cfg.errOut, ids,
 			func(ctx context.Context, id string) (*gmail.Message, error) {
 				return trashMessage(ctx, svc, id)

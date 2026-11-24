@@ -110,12 +110,12 @@ func label(ctx context.Context, cfg *config, opts labelOptions, args []string) e
 		created = append(created, l.Name)
 	}
 
-	err = recordChanges(ctx, cfg, svc, ids, created, func() error {
+	changed, err := recordChanges(ctx, cfg, svc, ids, created, func() error {
 		return modifyLabels(ctx, svc, ids, labelIDs(addLabels), labelIDs(removeLabels))
 	})
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(cfg.out, "%d messages updated: %s\n", len(ids), describeChanges(addLabels, removeLabels))
+	fmt.Fprintf(cfg.out, "%d messages updated: %s\n", changed, describeChanges(addLabels, removeLabels))
 	return nil
 }

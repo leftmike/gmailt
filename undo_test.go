@@ -193,11 +193,11 @@ func TestRecordChanges(t *testing.T) {
 	cfg := &config{History: filepath.Join(t.TempDir(), "history.jsonl"), command: "archive in:inbox"}
 	ctx := context.Background()
 	ids := []string{"a", "b", "c"}
-	err := recordChanges(ctx, cfg, svc, ids, []string{"New"}, func() error {
+	changed, err := recordChanges(ctx, cfg, svc, ids, []string{"New"}, func() error {
 		return modifyLabels(ctx, svc, ids, nil, []string{"INBOX"})
 	})
-	if err != nil {
-		t.Fatal(err)
+	if err != nil || changed != 2 {
+		t.Fatalf("recordChanges: got %d changed, %v", changed, err)
 	}
 
 	entries, _, _, err := readHistory(cfg.History)

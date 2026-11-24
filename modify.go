@@ -31,12 +31,12 @@ func archive(ctx context.Context, cfg *config, args []string) error {
 	if err != nil {
 		return err
 	}
-	err = recordChanges(ctx, cfg, svc, ids, nil, func() error {
+	changed, err := recordChanges(ctx, cfg, svc, ids, nil, func() error {
 		return modifyLabels(ctx, svc, ids, nil, []string{"INBOX"})
 	})
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(cfg.out, "%d messages archived\n", len(ids))
+	fmt.Fprintf(cfg.out, "%d messages archived\n", changed)
 	return nil
 }

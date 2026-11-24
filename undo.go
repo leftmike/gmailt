@@ -239,7 +239,7 @@ func commandLine(args []string) string {
 }
 
 func recordChanges(ctx context.Context, cfg *config, svc *gmail.Service, ids, created []string,
-	change func() error) error {
+	change func() error) (int, error) {
 
 	profile, err := retry(ctx, func() (*gmail.Profile, error) {
 		return svc.Users.GetProfile("me").Context(ctx).Do()
@@ -247,12 +247,17 @@ func recordChanges(ctx context.Context, cfg *config, svc *gmail.Service, ids, cr
 	changeErr := change()
 	if err != nil {
 		warn(cfg, fmt.Errorf("not saved to history: %w", err))
-		return changeErr
+		return len(ids), changeErr
 	}
 
+	changed := len(ids)
 	records, err := listHistory(ctx, svc, profile.HistoryId)
 	if err == nil {
 		changes := netChanges(records, ids)
+		changed = 0
+		for _, c := range changes {
+			changed += len(c.IDs)
+		}
 		if len(changes) > 0 || len(created) > 0 {
 			var bad int
 			_, bad, err = appendHistory(cfg.History, historyEntry{
@@ -266,7 +271,7 @@ func recordChanges(ctx context.Context, cfg *config, svc *gmail.Service, ids, cr
 	if err != nil {
 		warn(cfg, fmt.Errorf("not saved to history: %w", err))
 	}
-	return changeErr
+	return changed, changeErr
 }
 
 func notFound(err error) bool {
