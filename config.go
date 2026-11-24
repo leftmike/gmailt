@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -61,11 +63,14 @@ func expandHome(path string) string {
 func readConfig(filenames []string) (*config, error) {
 	for _, name := range filenames {
 		buf, err := os.ReadFile(name)
-		if err == nil {
-			var cfg config
-			err := hclsimple.Decode(name, buf, nil, &cfg)
-			return &cfg, err
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		} else if err != nil {
+			return nil, err
 		}
+		var cfg config
+		err = hclsimple.Decode(name, buf, nil, &cfg)
+		return &cfg, err
 	}
 
 	return nil, nil

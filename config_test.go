@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -87,5 +88,22 @@ func TestReadConfigError(t *testing.T) {
 	}
 	if cfg, err := readConfig([]string{filepath.Join(t.TempDir(), "none.hcl")}); cfg != nil || err != nil {
 		t.Errorf("readConfig missing: got %v, %v", cfg, err)
+	}
+
+	dir := t.TempDir()
+	unreadable := filepath.Join(dir, "gmailt.hcl")
+	if err := os.Mkdir(unreadable, 0700); err != nil {
+		t.Fatal(err)
+	}
+	good := filepath.Join(dir, "good.hcl")
+	if err := os.WriteFile(good, []byte("token = \"good.json\"\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if cfg, err := readConfig([]string{unreadable, good}); err == nil || cfg != nil {
+		t.Errorf("readConfig unreadable: got %+v, %v", cfg, err)
+	}
+	_, _, err := loadConfig(flag.NewFlagSet("test", flag.ContinueOnError), []string{"-config", unreadable})
+	if err == nil || strings.Contains(err.Error(), "not found") {
+		t.Errorf("-config unreadable: got %v", err)
 	}
 }
