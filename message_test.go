@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -65,5 +66,20 @@ func TestFormatBody(t *testing.T) {
 		if got := msg.formatBody(false); got != c.body {
 			t.Errorf("%s: formatBody: got %q, want %q", c.file, got, c.body)
 		}
+	}
+}
+
+func TestPrintContent(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("testdata", "multipart.eml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var b strings.Builder
+	if err := printMessage(&b, "parts", raw); err != nil {
+		t.Fatal(err)
+	}
+	want := "multipart/alternative\n  text/plain [quoted-printable]\n  text/html [base64]\n"
+	if b.String() != want {
+		t.Errorf("printContent: got %q, want %q", b.String(), want)
 	}
 }

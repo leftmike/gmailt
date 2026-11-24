@@ -167,7 +167,7 @@ func printPartContent(w io.Writer, contentType, transferEnc string, body []byte,
 	if strings.HasPrefix(mediaType, "multipart/") {
 		mr := multipart.NewReader(bytes.NewReader(body), params["boundary"])
 		for {
-			part, err := mr.NextPart()
+			part, err := mr.NextRawPart()
 			if err != nil {
 				break
 			}
