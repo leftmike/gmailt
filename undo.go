@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -47,33 +49,44 @@ func (e historyEntry) messageCount() int {
 	return len(ids)
 }
 
-func readHistory(path string) ([]historyEntry, map[int]bool, error) {
+func readHistory(path string) ([]historyEntry, map[int]bool, int, error) {
 	undone := map[int]bool{}
 	f, err := os.Open(path)
 	if errors.Is(err, fs.ErrNotExist) {
-		return nil, undone, nil
+		return nil, undone, 0, nil
 	} else if err != nil {
-		return nil, nil, err
+		return nil, nil, 0, err
 	}
 	defer f.Close()
 
 	var entries []historyEntry
-	dec := json.NewDecoder(f)
+	bad := 0
+	r := bufio.NewReader(f)
 	for {
-		var e historyEntry
-		err := dec.Decode(&e)
+		line, err := r.ReadBytes('\n')
+		if len(bytes.TrimSpace(line)) > 0 {
+			var e historyEntry
+			if json.Unmarshal(line, &e) != nil {
+				bad += 1
+			} else if e.Undone != 0 {
+				undone[e.Undone] = true
+			} else {
+				entries = append(entries, e)
+			}
+		}
 		if err == io.EOF {
 			break
 		} else if err != nil {
-			return nil, nil, fmt.Errorf("%s: %w", path, err)
-		}
-		if e.Undone != 0 {
-			undone[e.Undone] = true
-		} else {
-			entries = append(entries, e)
+			return nil, nil, 0, err
 		}
 	}
-	return entries, undone, nil
+	return entries, undone, bad, nil
+}
+
+func warnBadHistory(cfg *config, bad int) {
+	if bad > 0 {
+		warn(cfg, fmt.Errorf("%s: skipped %d unreadable lines", cfg.History, bad))
+	}
 }
 
 func writeHistory(path string, flags int, records []historyEntry) error {
@@ -94,10 +107,25 @@ func writeHistory(path string, flags int, records []historyEntry) error {
 	return f.Close()
 }
 
-func appendHistory(path string, e historyEntry, now time.Time) (int, error) {
-	entries, undone, err := readHistory(path)
+func rewriteHistory(path string, entries []historyEntry, undone map[int]bool, extra ...historyEntry) error {
+	var records []historyEntry
+	for _, e := range entries {
+		records = append(records, e)
+		if undone[e.N] {
+			records = append(records, historyEntry{Undone: e.N})
+		}
+	}
+	tmp := path + ".tmp"
+	if err := writeHistory(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, append(records, extra...)); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
+}
+
+func appendHistory(path string, e historyEntry, now time.Time) (int, int, error) {
+	entries, undone, bad, err := readHistory(path)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	for _, old := range entries {
 		e.N = max(e.N, old.N)
@@ -106,25 +134,12 @@ func appendHistory(path string, e historyEntry, now time.Time) (int, error) {
 	e.Time = now
 
 	cutoff := now.AddDate(0, 0, -historyDays)
-	if !slices.ContainsFunc(entries, func(old historyEntry) bool { return old.Time.Before(cutoff) }) {
-		return e.N, writeHistory(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, []historyEntry{e})
+	if bad == 0 && !slices.ContainsFunc(entries, func(old historyEntry) bool { return old.Time.Before(cutoff) }) {
+		return e.N, 0, writeHistory(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, []historyEntry{e})
 	}
 
-	var keep []historyEntry
-	for _, old := range entries {
-		if old.Time.Before(cutoff) {
-			continue
-		}
-		keep = append(keep, old)
-		if undone[old.N] {
-			keep = append(keep, historyEntry{Undone: old.N})
-		}
-	}
-	tmp := path + ".tmp"
-	if err := writeHistory(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, append(keep, e)); err != nil {
-		return 0, err
-	}
-	return e.N, os.Rename(tmp, path)
+	keep := slices.DeleteFunc(entries, func(old historyEntry) bool { return old.Time.Before(cutoff) })
+	return e.N, bad, rewriteHistory(path, keep, undone, e)
 }
 
 func netChanges(records []*gmail.History, ids []string) []labelChange {
@@ -239,11 +254,13 @@ func recordChanges(ctx context.Context, cfg *config, svc *gmail.Service, ids, cr
 	if err == nil {
 		changes := netChanges(records, ids)
 		if len(changes) > 0 || len(created) > 0 {
-			_, err = appendHistory(cfg.History, historyEntry{
+			var bad int
+			_, bad, err = appendHistory(cfg.History, historyEntry{
 				Command: cfg.command,
 				Changes: changes,
 				Created: created,
 			}, time.Now())
+			warnBadHistory(cfg, bad)
 		}
 	}
 	if err != nil {
@@ -358,10 +375,11 @@ func undo(ctx context.Context, cfg *config, args []string) error {
 	if len(args) > 1 {
 		return usageError("[<n>]")
 	}
-	entries, undone, err := readHistory(cfg.History)
+	entries, undone, bad, err := readHistory(cfg.History)
 	if err != nil {
 		return err
 	}
+	warnBadHistory(cfg, bad)
 	e, err := findUndo(entries, undone, args)
 	if err != nil {
 		return err
@@ -387,8 +405,13 @@ func undo(ctx context.Context, cfg *config, args []string) error {
 	for _, name := range e.Created {
 		fmt.Fprintf(cfg.out, "label %s was created by this command and is left in place\n", name)
 	}
-	err = writeHistory(cfg.History, os.O_WRONLY|os.O_CREATE|os.O_APPEND,
-		[]historyEntry{{Undone: e.N}})
+	if bad > 0 {
+		undone[e.N] = true
+		err = rewriteHistory(cfg.History, entries, undone)
+	} else {
+		err = writeHistory(cfg.History, os.O_WRONLY|os.O_CREATE|os.O_APPEND,
+			[]historyEntry{{Undone: e.N}})
+	}
 	if err != nil {
 		return err
 	}
@@ -409,10 +432,11 @@ func history(ctx context.Context, cfg *config, args []string) error {
 	if len(args) != 0 {
 		return usageError("")
 	}
-	entries, undone, err := readHistory(cfg.History)
+	entries, undone, bad, err := readHistory(cfg.History)
 	if err != nil {
 		return err
 	}
+	warnBadHistory(cfg, bad)
 	for _, e := range slices.Backward(entries) {
 		fmt.Fprintln(cfg.out, formatHistoryLine(e, undone[e.N]))
 	}

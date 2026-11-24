@@ -551,6 +551,33 @@ func TestVerboseRetry(t *testing.T) {
 	}
 }
 
+func TestUndoDamagedHistory(t *testing.T) {
+	tr := newTestRun(t)
+
+	tr.ok("archive", "in:inbox")
+	f, err := os.OpenFile(tr.history, os.O_WRONLY|os.O_APPEND, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.WriteString(`{"n":2,"ti`)
+	f.Close()
+
+	warning := "gmailt history: warning: " + tr.history + ": skipped 1 unreadable lines\n"
+	out, errOut, err := tr.run("history")
+	if err != nil || errOut != warning || !strings.HasSuffix(out, "archive in:inbox\n") {
+		t.Errorf("history: got %v, stdout %q, stderr %q", err, out, errOut)
+	}
+
+	out, errOut, err = tr.run("undo")
+	if err != nil || !strings.Contains(errOut, "skipped 1 unreadable lines") ||
+		!strings.HasSuffix(out, "undid 1: archive in:inbox\n") {
+		t.Errorf("undo: got %v, stdout %q, stderr %q", err, out, errOut)
+	}
+	if got := tr.ok("history"); !strings.HasSuffix(got, "archive in:inbox  (undone)\n") {
+		t.Errorf("history after undo: got %q", got)
+	}
+}
+
 func TestLabelsCommand(t *testing.T) {
 	tr := newTestRun(t)
 	want := lines(

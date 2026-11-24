@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -50,7 +51,7 @@ func TestHistoryFile(t *testing.T) {
 	change := []labelChange{{IDs: []string{"a"}, Removed: []string{"INBOX"}}}
 
 	for i, when := range []time.Time{now.AddDate(0, 0, -40), now.AddDate(0, 0, -2), now} {
-		n, err := appendHistory(path, historyEntry{Command: "archive x", Changes: change}, when)
+		n, _, err := appendHistory(path, historyEntry{Command: "archive x", Changes: change}, when)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -65,7 +66,7 @@ func TestHistoryFile(t *testing.T) {
 		}
 	}
 
-	entries, undone, err := readHistory(path)
+	entries, undone, _, err := readHistory(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +91,7 @@ func TestHistoryFile(t *testing.T) {
 		t.Error("findUndo all undone: expected error")
 	}
 
-	if entries, _, err := readHistory(filepath.Join(t.TempDir(), "none")); err != nil || entries != nil {
+	if entries, _, _, err := readHistory(filepath.Join(t.TempDir(), "none")); err != nil || entries != nil {
 		t.Errorf("readHistory missing: got %v, %v", entries, err)
 	}
 }
@@ -125,6 +126,39 @@ func TestRevertChange(t *testing.T) {
 		!slices.Equal(batch.AddLabelIds, []string{"INBOX"}) ||
 		!slices.Equal(batch.RemoveLabelIds, []string{"STARRED"}) {
 		t.Errorf("revertChange: untrashed %v, batch %+v", untrashed, batch)
+	}
+}
+
+func TestHistoryDamaged(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "history.jsonl")
+	now := time.Date(2026, 11, 22, 10, 0, 0, 0, time.UTC)
+	var many []string
+	for i := range 10000 {
+		many = append(many, fmt.Sprintf("%016x", i))
+	}
+	if _, _, err := appendHistory(path, historyEntry{Command: "archive big",
+		Changes: []labelChange{{IDs: many, Removed: []string{"INBOX"}}}}, now); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.WriteString(`{"n":2,"time":"2026-11`)
+	f.Close()
+
+	entries, _, bad, err := readHistory(path)
+	if err != nil || bad != 1 || len(entries) != 1 || entries[0].messageCount() != 10000 {
+		t.Fatalf("readHistory: got %d entries, %d bad, %v", len(entries), bad, err)
+	}
+
+	n, bad, err := appendHistory(path, historyEntry{Command: "archive x"}, now)
+	if err != nil || n != 2 || bad != 1 {
+		t.Errorf("appendHistory: got n %d, %d bad, %v", n, bad, err)
+	}
+	entries, _, bad, err = readHistory(path)
+	if err != nil || bad != 0 || len(entries) != 2 {
+		t.Errorf("readHistory after rewrite: got %d entries, %d bad, %v", len(entries), bad, err)
 	}
 }
 
@@ -166,7 +200,7 @@ func TestRecordChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	entries, _, err := readHistory(cfg.History)
+	entries, _, _, err := readHistory(cfg.History)
 	if err != nil {
 		t.Fatal(err)
 	}
