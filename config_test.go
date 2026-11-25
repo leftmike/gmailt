@@ -35,7 +35,7 @@ func TestLoadConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dir := filepath.Join(home, ".gmailt")
+	dir := filepath.Join(home, ".gmail")
 	if cfg.Credentials != filepath.Join(dir, "credentials.json") ||
 		cfg.Token != filepath.Join(dir, "token.json") ||
 		cfg.History != filepath.Join(dir, "history.jsonl") || !slices.Equal(args, []string{"a", "b"}) {
@@ -46,7 +46,7 @@ func TestLoadConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	hcl := "credentials = \"~/creds.json\"\ntoken = \"/tmp/tok.json\"\nhistory = \"~/h.jsonl\"\n"
-	if err := os.WriteFile(filepath.Join(dir, "gmailt.hcl"), []byte(hcl), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "gmail.hcl"), []byte(hcl), 0600); err != nil {
 		t.Fatal(err)
 	}
 	cfg, _, err = loadConfig(flag.NewFlagSet("test", flag.ContinueOnError),
@@ -91,7 +91,7 @@ func TestReadConfigError(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	unreadable := filepath.Join(dir, "gmailt.hcl")
+	unreadable := filepath.Join(dir, "gmail.hcl")
 	if err := os.Mkdir(unreadable, 0700); err != nil {
 		t.Fatal(err)
 	}

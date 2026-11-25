@@ -191,7 +191,7 @@ func authorize(ctx context.Context, oc *oauth2.Config, w io.Writer) (*oauth2.Tok
 		if res.err != nil {
 			http.Error(w, res.err.Error(), http.StatusBadRequest)
 		} else {
-			fmt.Fprintln(w, "gmailt is authorized; you can close this window.")
+			fmt.Fprintln(w, "gmail is authorized; you can close this window.")
 		}
 		select {
 		case ch <- res:
@@ -207,7 +207,7 @@ func authorize(ctx context.Context, oc *oauth2.Config, w io.Writer) (*oauth2.Tok
 
 	authURL := oc.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.ApprovalForce,
 		oauth2.S256ChallengeOption(verifier))
-	fmt.Fprintf(w, "open this URL in a browser to authorize gmailt:\n\n%s\n\n", authURL)
+	fmt.Fprintf(w, "open this URL in a browser to authorize gmail:\n\n%s\n\n", authURL)
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()

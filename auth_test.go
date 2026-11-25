@@ -116,7 +116,7 @@ func TestAuthorizeOutput(t *testing.T) {
 		lines = append(lines, strings.TrimSuffix(line, "\n"))
 	}
 	go io.Copy(io.Discard, r)
-	if lines[0] != "open this URL in a browser to authorize gmailt:" || lines[1] != "" {
+	if lines[0] != "open this URL in a browser to authorize gmail:" || lines[1] != "" {
 		t.Fatalf("authorize: got %q", lines)
 	}
 

@@ -52,7 +52,7 @@ var (
 
 	cmds = map[string]cmd{
 		"list":    {setup: listCmd, help: "list messages matching a Gmail search query (default in:inbox)"},
-		"auth":    {setup: authCmd, help: "authorize gmailt with Google, or revoke the saved token"},
+		"auth":    {setup: authCmd, help: "authorize gmail with Google, or revoke the saved token"},
 		"config":  {setup: noFlags(showConfig), help: "show the effective configuration"},
 		"get":     {setup: getCmd, help: "fetch and display messages by id or Gmail search query"},
 		"label":   {setup: labelCmd, help: "add (+name) and remove (^name) labels on messages by id or Gmail search query"},

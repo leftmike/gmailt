@@ -313,8 +313,8 @@ func (tr *testRun) run(args ...string) (string, string, error) {
 		service: tr.f.svc,
 		out:     &out,
 		errOut:  &errOut,
-		name:    "gmailt " + args[0],
-		program: "gmailt",
+		name:    "gmail " + args[0],
+		program: "gmail",
 		command: commandLine(args),
 	}
 	err := run(tr.t.Context(), cfg, fs.Args())
@@ -522,7 +522,7 @@ func TestUndoMissingMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("undo: %v", err)
 	}
-	if errOut != "gmailt undo: warning: 000000000000000a no longer exists\n" {
+	if errOut != "gmail undo: warning: 000000000000000a no longer exists\n" {
 		t.Errorf("undo stderr: got %q", errOut)
 	}
 	if !strings.HasPrefix(out, "1 messages restored: ^TRASH\n") {
@@ -562,7 +562,7 @@ func TestUndoDamagedHistory(t *testing.T) {
 	f.WriteString(`{"n":2,"ti`)
 	f.Close()
 
-	warning := "gmailt history: warning: " + tr.history + ": skipped 1 unreadable lines\n"
+	warning := "gmail history: warning: " + tr.history + ": skipped 1 unreadable lines\n"
 	out, errOut, err := tr.run("history")
 	if err != nil || errOut != warning || !strings.HasSuffix(out, "archive in:inbox\n") {
 		t.Errorf("history: got %v, stdout %q, stderr %q", err, out, errOut)
@@ -623,7 +623,7 @@ func TestHistoryWarning(t *testing.T) {
 	tr.history = filepath.Join(t.TempDir(), "missing", "dir", "\x00bad")
 	out, errOut, err := tr.run("archive", "000000000000000c")
 	if err != nil || out != "1 messages archived\n" ||
-		!strings.HasPrefix(errOut, "gmailt archive: warning: not saved to history: ") {
+		!strings.HasPrefix(errOut, "gmail archive: warning: not saved to history: ") {
 		t.Errorf("archive: got %q, %q, %v", out, errOut, err)
 	}
 }

@@ -1,4 +1,4 @@
-# gmailt TODO
+# gmail TODO
 
 ## `send`
 

@@ -1,4 +1,4 @@
-module github.com/leftmike/gmailt
+module github.com/leftmike/gmail
 
 go 1.27.3
 

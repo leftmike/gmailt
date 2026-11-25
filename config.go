@@ -35,18 +35,18 @@ func configDir() string {
 		return "."
 	}
 	if runtime.GOOS == "windows" {
-		return filepath.Join(home, "gmailt")
+		return filepath.Join(home, "gmail")
 	}
-	return filepath.Join(home, ".gmailt")
+	return filepath.Join(home, ".gmail")
 }
 
 func configFilenames() []string {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return []string{"./gmailt.hcl"}
+		return []string{"./gmail.hcl"}
 	}
-	return []string{filepath.Join(configDir(), "gmailt.hcl"), filepath.Join(home, ".gmailt.hcl"),
-		"./gmailt.hcl"}
+	return []string{filepath.Join(configDir(), "gmail.hcl"), filepath.Join(home, ".gmail.hcl"),
+		"./gmail.hcl"}
 }
 
 func expandHome(path string) string {

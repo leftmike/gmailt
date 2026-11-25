@@ -1,4 +1,4 @@
-# gmailt
+# gmail
 
 A command line tool for managing Gmail: list, read, label, archive, and delete messages, and
 undo those changes. It is modeled on [pop3t](https://github.com/leftmike/pop3t), but uses the
@@ -7,34 +7,34 @@ Gmail API with OAuth instead of POP3 and passwords.
 ## Install
 
 ```
-go install github.com/leftmike/gmailt@latest
+go install github.com/leftmike/gmail@latest
 ```
 
 ## Google Cloud setup
 
-gmailt needs an OAuth client of your own. This is a one-time setup:
+gmail needs an OAuth client of your own. This is a one-time setup:
 
 1. In the [Google Cloud console](https://console.cloud.google.com/), create a project and
    enable the **Gmail API** for it.
 2. Configure the **OAuth consent screen**: choose **External** and add your Gmail address as a
    test user.
 3. Under **Credentials**, create an **OAuth client ID** of type **Desktop app**, download its
-   JSON file, and save it as `~/.gmailt/credentials.json`.
-4. Run `gmailt auth`. It prints a URL; open it in a browser, sign in, and allow access. The
-   token is saved to `~/.gmailt/token.json` (mode `0600`).
+   JSON file, and save it as `~/.gmail/credentials.json`.
+4. Run `gmail auth`. It prints a URL; open it in a browser, sign in, and allow access. The
+   token is saved to `~/.gmail/token.json` (mode `0600`).
 
 While the app's publishing status is **Testing**, Google expires the token after 7 days and
-gmailt will ask you to run `gmailt auth` again. Setting the status to **In production** avoids
+gmail will ask you to run `gmail auth` again. Setting the status to **In production** avoids
 this; since the app is unverified, Google shows an "unverified app" warning once, which you can
 click through for your own use.
 
-gmailt asks only for the `gmail.modify` scope: it can read, label, and trash messages, but it
+gmail asks only for the `gmail.modify` scope: it can read, label, and trash messages, but it
 can't permanently delete them. Gmail empties the trash after 30 days.
 
 ## Usage
 
 ```
-gmailt <cmd> [flags] [args]
+gmail <cmd> [flags] [args]
 ```
 
 | Command | Description |
@@ -47,7 +47,7 @@ gmailt <cmd> [flags] [args]
 | `labels` | List labels with message and unread counts. |
 | `undo [<n>]` | Undo the most recent `label`, `archive`, or `delete`, or entry `<n>` from `history`. |
 | `history` | Show the commands that `undo` can reverse. |
-| `auth [-revoke]` | Authorize gmailt, or revoke and delete the saved token. |
+| `auth [-revoke]` | Authorize gmail, or revoke and delete the saved token. |
 | `config` | Show the effective configuration. |
 | `help` | Show help. |
 
@@ -59,12 +59,12 @@ command acts on those messages; otherwise the arguments are joined into a
 in Gmail. Mixing ids and query words is an error.
 
 ```
-gmailt list                              # in:inbox, newest 50
-gmailt list is:unread in:inbox
-gmailt list -n 0 label:receipts older_than:1y
-gmailt get 18f3a2b4c5d6e7f8
-gmailt archive from:newsletter@example.com
-gmailt delete in:spam older_than:30d
+gmail list                              # in:inbox, newest 50
+gmail list is:unread in:inbox
+gmail list -n 0 label:receipts older_than:1y
+gmail get 18f3a2b4c5d6e7f8
+gmail archive from:newsletter@example.com
+gmail delete in:spam older_than:30d
 ```
 
 `list` defaults to `in:inbox` and shows at most 50 messages unless `-n` is given (`-n 0` for no
@@ -75,8 +75,8 @@ Flags go before the query. A query starting with `-` (negation) needs `--` first
 characters such as `(`, `)`, and `"` need quoting:
 
 ```
-gmailt list -- -in:inbox -in:sent
-gmailt archive 'subject:"weekly report"'
+gmail list -- -in:inbox -in:sent
+gmail archive 'subject:"weekly report"'
 ```
 
 ### Labels
@@ -95,8 +95,8 @@ Gmail's system labels work too:
 | archive | `label ^inbox <query>` (or `archive <query>`) |
 
 ```
-gmailt label +receipts ^inbox from:orders@example.com
-gmailt label -create +"Assisted Living" 18f3a2b4c5d6e7f8
+gmail label +receipts ^inbox from:orders@example.com
+gmail label -create +"Assisted Living" 18f3a2b4c5d6e7f8
 ```
 
 ### Undo
@@ -106,7 +106,7 @@ Gmail's own change history, so a message that already had a label isn't affected
 command is undone. `history` lists the recorded commands, newest first:
 
 ```
-$ gmailt history
+$ gmail history
    2  2026-11-22 18:08       3  delete from:old@example.com
    1  2026-11-22 18:06      28  archive in:inbox  (undone)
 ```
@@ -119,18 +119,18 @@ place. Entries older than 30 days are dropped.
 
 Settings are read from the first of these files that exists, or from `-config <file>`:
 
-- `~/.gmailt/gmailt.hcl` (`~/gmailt/gmailt.hcl` on Windows)
-- `~/.gmailt.hcl`
-- `./gmailt.hcl`
+- `~/.gmail/gmail.hcl` (`~/gmail/gmail.hcl` on Windows)
+- `~/.gmail.hcl`
+- `./gmail.hcl`
 
 ```hcl
-credentials = "~/.gmailt/credentials.json"
-token       = "~/.gmailt/token.json"
-history     = "~/.gmailt/history.jsonl"
+credentials = "~/.gmail/credentials.json"
+token       = "~/.gmail/token.json"
+history     = "~/.gmail/history.jsonl"
 ```
 
 These are the defaults, so a config file is only needed to change them. Each can also be given
 as a flag (`-credentials`, `-token`, `-history`), which takes precedence over the config file.
-`gmailt config` shows the values in effect.
+`gmail config` shows the values in effect.
 
 `-v` (or `-verbose`) prints each Gmail API call, with its status and time, to stderr.
